@@ -43,6 +43,10 @@ document.addEventListener("DOMContentLoaded", function () {
     const fundoModalRetirada = document.getElementById("fundo-modal-retirada");
     const textoDisponivelRetirada = document.getElementById("texto-disponivel-retirada");
     const campoValorRetirada = document.getElementById("campo-valor-retirada");
+    const campoMetaRetiradaWrapper = document.getElementById("campo-meta-retirada-wrapper");
+    const campoMetaRetirada = document.getElementById("campo-meta-retirada");
+    const campoBancoRetiradaWrapper = document.getElementById("campo-banco-retirada-wrapper");
+    const campoBancoRetirada = document.getElementById("campo-banco-retirada");
     const mensagemAvisoRetirada = document.getElementById("mensagem-aviso-retirada");
     const botaoConfirmarRetirada = document.getElementById("botao-confirmar-retirada");
     const spinnerRetirada = botaoConfirmarRetirada.querySelector(".spinner-botao");
@@ -77,6 +81,14 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     let uidAtual = null;
+
+    // Formata pro padrão "AAAA-MM" — mesmo campo usado nos lançamentos pra
+    // decidir em qual mês eles contam (separado da data exibida neles).
+    // Aqui em Saldo Guardado não existe navegação por mês, então sempre
+    // usa o mês real de hoje.
+    function mesReferenciaString(data) {
+        return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+    }
     let totalAtual = 0;
     let todosOsDepositos = []; // todos os lançamentos de "Guardar Dinheiro" (pra somar por meta)
     let metaEmEdicaoId = null;
@@ -173,8 +185,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function totalGuardadoNaMeta(nomeDaMeta) {
+        // Mesma correção do banco: soma depósitos E retiradas marcadas com
+        // essa meta, senão o total nunca diminuía ao retirar
         return todosOsDepositos
-            .filter((documento) => documento.data().meta === nomeDaMeta && documento.data().valor > 0)
+            .filter((documento) => documento.data().meta === nomeDaMeta)
             .reduce((soma, documento) => soma + documento.data().valor, 0);
     }
 
@@ -288,8 +302,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function totalGuardadoNoBanco(nomeDoBanco) {
+        // Soma TUDO que tem esse banco marcado — depósitos (positivos) E
+        // retiradas (negativas) — senão o total nunca diminuía ao retirar
         return todosOsDepositos
-            .filter((documento) => documento.data().banco === nomeDoBanco && documento.data().valor > 0)
+            .filter((documento) => documento.data().banco === nomeDoBanco)
             .reduce((soma, documento) => soma + documento.data().valor, 0);
     }
 
@@ -377,6 +393,49 @@ document.addEventListener("DOMContentLoaded", function () {
         campoValorRetirada.value = "";
         mensagemAvisoRetirada.classList.remove("visivel");
         textoDisponivelRetirada.textContent = `Você tem ${formatarMoeda(totalAtual)} guardado.`;
+
+        // Só mostra a pergunta "de qual meta" se a pessoa já tiver alguma
+        // meta cadastrada — senão não faz sentido perguntar
+        if (listaDeMetas.length > 0) {
+            campoMetaRetiradaWrapper.hidden = false;
+            campoMetaRetirada.innerHTML = "";
+
+            const opcaoNaoEspecificarMeta = document.createElement("option");
+            opcaoNaoEspecificarMeta.value = "";
+            opcaoNaoEspecificarMeta.textContent = "Não especificar";
+            campoMetaRetirada.appendChild(opcaoNaoEspecificarMeta);
+
+            listaDeMetas.forEach((meta) => {
+                const opcao = document.createElement("option");
+                opcao.value = meta.nome;
+                opcao.textContent = meta.nome;
+                campoMetaRetirada.appendChild(opcao);
+            });
+        } else {
+            campoMetaRetiradaWrapper.hidden = true;
+        }
+
+        // Só mostra a pergunta "de qual banco" se a pessoa já tiver algum
+        // banco cadastrado — senão não faz sentido perguntar
+        if (listaDeBancos.length > 0) {
+            campoBancoRetiradaWrapper.hidden = false;
+            campoBancoRetirada.innerHTML = "";
+
+            const opcaoNaoEspecificar = document.createElement("option");
+            opcaoNaoEspecificar.value = "";
+            opcaoNaoEspecificar.textContent = "Não especificar";
+            campoBancoRetirada.appendChild(opcaoNaoEspecificar);
+
+            listaDeBancos.forEach((banco) => {
+                const opcao = document.createElement("option");
+                opcao.value = banco.nome;
+                opcao.textContent = banco.nome;
+                campoBancoRetirada.appendChild(opcao);
+            });
+        } else {
+            campoBancoRetiradaWrapper.hidden = true;
+        }
+
         fundoModalRetirada.classList.add("aberto");
     }
 
@@ -409,13 +468,22 @@ document.addEventListener("DOMContentLoaded", function () {
         botaoConfirmarRetirada.disabled = true;
         spinnerRetirada.hidden = false;
 
-        // 1) Reduz o total guardado (valor negativo, mesma categoria)
+        const bancoEscolhidoRetirada = campoBancoRetirada.value || null;
+        const metaEscolhidaRetirada = campoMetaRetirada.value || null;
+        const agora = new Date();
+
+        // 1) Reduz o total guardado (valor negativo, mesma categoria) — marca
+        // o banco/meta escolhidos, senão os totais nunca diminuíam na
+        // retirada (ficavam só somando os depósitos, sem nunca descontar)
         await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
             tipo: "gasto",
             valor: -valor,
             categoria: "Guardar Dinheiro",
             descricao: "Retirada",
-            data: Timestamp.fromDate(new Date()),
+            banco: bancoEscolhidoRetirada,
+            meta: metaEscolhidaRetirada,
+            data: Timestamp.fromDate(agora),
+            mesReferencia: mesReferenciaString(agora),
             criadoEm: serverTimestamp()
         });
 
@@ -428,6 +496,7 @@ document.addEventListener("DOMContentLoaded", function () {
             categoria: "Retirada da Reserva",
             descricao: "",
             data: Timestamp.fromDate(new Date()),
+            mesReferencia: mesReferenciaString(new Date()),
             criadoEm: serverTimestamp()
         });
 
