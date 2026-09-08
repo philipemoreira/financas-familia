@@ -1,7 +1,7 @@
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-    collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, getDocs, writeBatch,
+    collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, getDocs, getDoc, setDoc, writeBatch,
     query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -87,7 +87,11 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
         uidAtual = usuario.uid;
-        await migrarLancamentosAntigos();
+
+        const perfilSnapshot = await getDoc(doc(db, "usuarios", uidAtual));
+        const jaMigrou = perfilSnapshot.exists() && perfilSnapshot.data().migracaoMesReferenciaConcluida;
+        if (!jaMigrou) await migrarLancamentosAntigos();
+
         atualizarRotuloMes();
         escutarAnotacoesDoMes();
         escutarSaldoRealDoMes();
@@ -101,17 +105,20 @@ document.addEventListener("DOMContentLoaded", function () {
         const todosOsLancamentos = await getDocs(referencia);
 
         const semMesReferencia = todosOsLancamentos.docs.filter((documento) => !documento.data().mesReferencia);
-        if (semMesReferencia.length === 0) return;
 
-        for (let inicio = 0; inicio < semMesReferencia.length; inicio += 450) {
-            const pedaco = semMesReferencia.slice(inicio, inicio + 450);
-            const lote = writeBatch(db);
-            pedaco.forEach((documento) => {
-                const dataDoLancamento = documento.data().data.toDate();
-                lote.update(documento.ref, { mesReferencia: mesReferenciaString(dataDoLancamento) });
-            });
-            await lote.commit();
+        if (semMesReferencia.length > 0) {
+            for (let inicio = 0; inicio < semMesReferencia.length; inicio += 450) {
+                const pedaco = semMesReferencia.slice(inicio, inicio + 450);
+                const lote = writeBatch(db);
+                pedaco.forEach((documento) => {
+                    const dataDoLancamento = documento.data().data.toDate();
+                    lote.update(documento.ref, { mesReferencia: mesReferenciaString(dataDoLancamento) });
+                });
+                await lote.commit();
+            }
         }
+
+        await setDoc(doc(db, "usuarios", uidAtual), { migracaoMesReferenciaConcluida: true }, { merge: true });
     }
 
     // ==========================================================================

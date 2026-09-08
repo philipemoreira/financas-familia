@@ -222,7 +222,7 @@ document.addEventListener("DOMContentLoaded", function () {
         await carregarOrcamentos();
         await carregarMetas();
         await carregarBancos();
-        await migrarLancamentosAntigos();
+        if (!perfil.migracaoMesReferenciaConcluida) await migrarLancamentosAntigos();
         atualizarRotuloMes();
         escutarLancamentosDoMes();
         escutarPendenciasDoMes();
@@ -348,19 +348,26 @@ document.addEventListener("DOMContentLoaded", function () {
         const todosOsLancamentos = await getDocs(referencia);
 
         const semMesReferencia = todosOsLancamentos.docs.filter((documento) => !documento.data().mesReferencia);
-        if (semMesReferencia.length === 0) return;
 
-        // writeBatch aguenta até 500 operações — divide em pedaços por
-        // segurança, caso alguém tenha uma quantidade grande de lançamentos
-        for (let inicio = 0; inicio < semMesReferencia.length; inicio += 450) {
-            const pedaco = semMesReferencia.slice(inicio, inicio + 450);
-            const lote = writeBatch(db);
-            pedaco.forEach((documento) => {
-                const dataDoLancamento = documento.data().data.toDate();
-                lote.update(documento.ref, { mesReferencia: mesReferenciaString(dataDoLancamento) });
-            });
-            await lote.commit();
+        if (semMesReferencia.length > 0) {
+            // writeBatch aguenta até 500 operações — divide em pedaços por
+            // segurança, caso alguém tenha uma quantidade grande de lançamentos
+            for (let inicio = 0; inicio < semMesReferencia.length; inicio += 450) {
+                const pedaco = semMesReferencia.slice(inicio, inicio + 450);
+                const lote = writeBatch(db);
+                pedaco.forEach((documento) => {
+                    const dataDoLancamento = documento.data().data.toDate();
+                    lote.update(documento.ref, { mesReferencia: mesReferenciaString(dataDoLancamento) });
+                });
+                await lote.commit();
+            }
         }
+
+        // Marca no perfil que essa correção já rodou — sem isso, o app teria
+        // que buscar TODOS os lançamentos (mesmo já corrigidos) todo santo
+        // login, o que ia ficando cada vez mais lento conforme o histórico
+        // crescesse. Com a marca, roda de verdade só uma vez na vida.
+        await setDoc(doc(db, "usuarios", uidAtual), { migracaoMesReferenciaConcluida: true }, { merge: true });
     }
 
     async function verificarPendenciasAntigas() {
