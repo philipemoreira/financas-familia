@@ -1081,7 +1081,9 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        if (modoGuardar && valorDigitado > saldoAtualDoMes) {
+        // Compara em centavos (números inteiros), mesmo motivo da correção
+        // na tela de Saldo Guardado — evita erro de ponto flutuante
+        if (modoGuardar && Math.round(valorDigitado * 100) > Math.round(saldoAtualDoMes * 100)) {
             mostrarAviso(`Esse valor é maior do que o seu saldo atual (${formatarMoeda(saldoAtualDoMes)}). Não dá pra guardar mais do que você tem.`);
             return;
         }

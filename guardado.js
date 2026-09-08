@@ -459,7 +459,14 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        if (valor > totalAtual) {
+        // Compara em CENTAVOS (números inteiros), não em reais com decimais —
+        // números decimais em JavaScript podem ter erros de arredondamento
+        // minúsculos (tipo 5.359999999999999 em vez de 5.36 exato), o que
+        // fazia essa comparação falhar por uma fração invisível de centavo
+        const valorEmCentavos = Math.round(valor * 100);
+        const totalEmCentavos = Math.round(totalAtual * 100);
+
+        if (valorEmCentavos > totalEmCentavos) {
             mensagemAvisoRetirada.textContent = "Esse valor é maior do que você tem guardado.";
             mensagemAvisoRetirada.classList.add("visivel");
             return;
