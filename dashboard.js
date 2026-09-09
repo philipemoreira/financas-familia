@@ -143,6 +143,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const opcoesEspeciaisGasto = document.getElementById("opcoes-especiais-gasto");
     const campoFixo = document.getElementById("campo-fixo");
     const campoParcelado = document.getElementById("campo-parcelado");
+    const campoVencimentoLancamentoWrapper = document.getElementById("campo-vencimento-lancamento-wrapper");
+    const campoVencimentoLancamento = document.getElementById("campo-vencimento-lancamento");
     const mensagemAviso = document.getElementById("mensagem-aviso-modal");
     const botaoSalvar = document.getElementById("botao-salvar-lancamento");
     const textoBotaoSalvar = botaoSalvar.querySelector(".texto-botao");
@@ -839,6 +841,9 @@ document.addEventListener("DOMContentLoaded", function () {
         campoNovaCategoria.required = false; // sem isso, ficava "grudado" de uma vez que criou categoria nova antes
         campoParcelasWrapper.hidden = true;
         campoParcelas.required = false; // mesmo problema, grudava depois de usar "Parcelar" uma vez
+        campoVencimentoLancamentoWrapper.hidden = true;
+        campoVencimentoLancamento.required = false;
+        campoVencimentoLancamento.value = "";
         campoBancoWrapper.hidden = true;
         campoNovoBancoWrapper.hidden = true;
         campoNovoBanco.required = false;
@@ -1011,6 +1016,18 @@ document.addEventListener("DOMContentLoaded", function () {
         campoParcelas.required = parcelando;
         rotuloValor.textContent = parcelando ? "Valor total da compra" : "Valor";
         atualizarPreviewParcela();
+
+        // O campo de vencimento aparece pra Fixo OU Parcelado — é um dia
+        // separado da "Data" de propósito (Data = quando você registrou;
+        // Vencimento = todo dia X do mês). Já vem pré-preenchido com o dia
+        // que está na Data agora, só pra facilitar, mas pode ser trocado.
+        const precisaVencimento = campoFixo.checked || campoParcelado.checked;
+        campoVencimentoLancamentoWrapper.hidden = !precisaVencimento;
+        campoVencimentoLancamento.required = precisaVencimento;
+        if (precisaVencimento && !campoVencimentoLancamento.value) {
+            const dataAtual = campoData.value ? new Date(campoData.value + "T00:00:00") : new Date();
+            campoVencimentoLancamento.value = dataAtual.getDate();
+        }
     }
 
     // Mostra "= 6x de R$ 8,33" em tempo real, assim que a pessoa digita o
@@ -1226,9 +1243,9 @@ document.addEventListener("DOMContentLoaded", function () {
             const descricaoBase = campoDescricao.value.trim();
 
             if (ehParcelado) {
-                await salvarParcelado(valorDigitado, numeroParcelas, categoriaFinal, descricaoBase, dataEscolhida);
+                await salvarParcelado(valorDigitado, numeroParcelas, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10));
             } else if (campoFixo.checked) {
-                await salvarFixo(valorDigitado, categoriaFinal, descricaoBase, dataEscolhida);
+                await salvarFixo(valorDigitado, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10));
             } else {
                 await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
                     tipo: tipoSelecionado,
@@ -1262,16 +1279,17 @@ document.addEventListener("DOMContentLoaded", function () {
     // Cria uma "pendência" por parcela — nenhuma delas mexe no saldo ainda.
     // Só quando a pessoa marcar como paga (lá na seção "Pagamentos Pendentes")
     // é que vira um lançamento de verdade.
-    async function salvarParcelado(valorTotal, numeroParcelas, categoria, descricaoBase, dataInicial) {
+    async function salvarParcelado(valorTotal, numeroParcelas, categoria, descricaoBase, dataInicial, diaVencimento) {
         const valorParcela = Math.floor((valorTotal / numeroParcelas) * 100) / 100;
         const diferencaCentavos = Math.round((valorTotal - valorParcela * numeroParcelas) * 100) / 100;
         const grupoId = `parc_${Date.now()}`;
+        const diaEscolhido = diaVencimento || dataInicial.getDate(); // reserva de segurança
 
         for (let indice = 0; indice < numeroParcelas; indice++) {
             const anoDestino = dataInicial.getFullYear();
             const mesDestino = dataInicial.getMonth() + indice;
             const ultimoDiaDoMes = new Date(anoDestino, mesDestino + 1, 0).getDate();
-            const diaFinal = Math.min(dataInicial.getDate(), ultimoDiaDoMes);
+            const diaFinal = Math.min(diaEscolhido, ultimoDiaDoMes);
             const mesReferencia = `${new Date(anoDestino, mesDestino, 1).getFullYear()}-${String(new Date(anoDestino, mesDestino, 1).getMonth() + 1).padStart(2, "0")}`;
 
             const ehUltima = indice === numeroParcelas - 1;
@@ -1294,9 +1312,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    async function salvarFixo(valor, categoria, descricaoBase, dataInicial) {
+    async function salvarFixo(valor, categoria, descricaoBase, dataInicial, diaVencimento) {
         const grupoId = `fixo_${Date.now()}`;
-        const diaOriginal = dataInicial.getDate();
+        const diaOriginal = diaVencimento || dataInicial.getDate(); // reserva de segurança
 
         for (let indice = 0; indice < 12; indice++) {
             const anoDestino = dataInicial.getFullYear();
