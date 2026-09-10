@@ -57,6 +57,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const secaoFaturaCartao = document.getElementById("secao-fatura-cartao");
     const tituloFaturaCartao = document.getElementById("titulo-fatura-cartao");
     const valorFaturaCartao = document.getElementById("valor-fatura-cartao");
+    const vencimentoFaturaCartao = document.getElementById("vencimento-fatura-cartao");
     const linkExtrato = document.getElementById("link-extrato");
 
     const fundoModalEditarCategoria = document.getElementById("fundo-modal-editar-categoria");
@@ -193,6 +194,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let pararDeEscutarSalario = null;
     let salarioPadrao = 0;
     let nomeCartao = "";
+    let diaVencimentoFatura = null;
     let mapaOrcamentos = {}; // {categoria: limite}
     let primeiroNome = "";
     let idEmEdicao = null; // null = criando novo | string = editando esse lançamento
@@ -221,6 +223,7 @@ document.addEventListener("DOMContentLoaded", function () {
         primeiroNome = (perfil.nome || "").trim().split(" ")[0] || "";
         salarioPadrao = perfil.salarioPadrao || 0;
         nomeCartao = perfil.nomeCartao || "";
+        diaVencimentoFatura = perfil.diaVencimentoFatura || null;
 
         // Pro perfil Diarista, o botão do meio continua mostrando "Ganho";
         // pra todo mundo, mostra "Extra"
@@ -908,6 +911,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function irParaFormulario(tipoClicado) {
+        // "Cartão" não é um lançamento normal — leva direto pra tela própria
+        // do cartão, já com o formulário de adicionar item aberto
+        if (tipoClicado === "cartao") {
+            window.location.href = "cartao.html?adicionar=1";
+            return;
+        }
+
         // "guardar" não é um tipo de lançamento de verdade — por baixo dos
         // panos ele é um "ganho" com categoria fixa "Guardar Dinheiro".
         // "extra" também é só o nome do botão — internamente é "ganho" também.
@@ -1488,6 +1498,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         tituloFaturaCartao.textContent = nomeCartao ? `Fatura — ${nomeCartao}` : "Fatura do mês";
         valorFaturaCartao.textContent = formatarMoeda(totalFatura);
+        vencimentoFaturaCartao.textContent = diaVencimentoFatura ? `Vence dia ${diaVencimentoFatura}` : "";
     }
 
     // ==========================================================================

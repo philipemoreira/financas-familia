@@ -15,6 +15,12 @@
     padding: 14px 16px;
     border-bottom: 1px solid var(--borda);
     cursor: pointer;
+    animation: entrada-item-lista 0.3s ease both;
+}
+
+@keyframes entrada-item-lista {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .item-conta:hover {

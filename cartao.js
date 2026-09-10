@@ -8,9 +8,11 @@ import {
 document.addEventListener("DOMContentLoaded", function () {
 
     const campoNomeCartao = document.getElementById("campo-nome-cartao");
-    const botaoSalvarNomeCartao = document.getElementById("botao-salvar-nome-cartao");
+    const campoVencimentoFatura = document.getElementById("campo-vencimento-fatura");
+    const botaoSalvarConfigCartao = document.getElementById("botao-salvar-config-cartao");
 
     const totalFaturaEl = document.getElementById("total-fatura");
+    const textoVencimentoFatura = document.getElementById("texto-vencimento-fatura");
     const botaoMarcarFaturaPaga = document.getElementById("botao-marcar-fatura-paga");
     const textoFaturaPaga = document.getElementById("texto-fatura-paga");
     const botaoDesmarcarFatura = document.getElementById("botao-desmarcar-fatura");
@@ -28,7 +30,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const campoParcelasItemCartao = document.getElementById("campo-parcelas-item-cartao");
     const rotuloValorItemCartao = document.getElementById("rotulo-valor-item-cartao");
     const campoValorItemCartao = document.getElementById("campo-valor-item-cartao");
-    const campoVencimentoItemCartao = document.getElementById("campo-vencimento-item-cartao");
     const mensagemAvisoItemCartao = document.getElementById("mensagem-aviso-item-cartao");
     const botaoSalvarItemCartao = document.getElementById("botao-salvar-item-cartao");
 
@@ -45,6 +46,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let uidAtual = null;
     let nomeCartao = "";
+    let diaVencimentoFatura = null;
     let itensDaFatura = [];
 
     // ==========================================================================
@@ -104,16 +106,31 @@ document.addEventListener("DOMContentLoaded", function () {
         uidAtual = usuario.uid;
 
         const perfilSnapshot = await getDoc(doc(db, "usuarios", uidAtual));
-        nomeCartao = perfilSnapshot.exists() ? (perfilSnapshot.data().nomeCartao || "") : "";
+        const dadosPerfil = perfilSnapshot.exists() ? perfilSnapshot.data() : {};
+        nomeCartao = dadosPerfil.nomeCartao || "";
+        diaVencimentoFatura = dadosPerfil.diaVencimentoFatura || null;
+
         campoNomeCartao.value = nomeCartao;
+        campoVencimentoFatura.value = diaVencimentoFatura || "";
 
         escutarItensDoCartao();
+
+        // Se a pessoa veio direto do botão "Cartão" no +, já abre o
+        // formulário de adicionar item na hora, sem precisar clicar de novo
+        const parametros = new URLSearchParams(window.location.search);
+        if (parametros.get("adicionar") === "1") {
+            abrirModalNovoItem();
+        }
     });
 
-    botaoSalvarNomeCartao.addEventListener("click", async () => {
+    botaoSalvarConfigCartao.addEventListener("click", async () => {
         nomeCartao = campoNomeCartao.value.trim();
-        await setDoc(doc(db, "usuarios", uidAtual), { nomeCartao }, { merge: true });
-        mostrarToast("Nome salvo ✓");
+        const novoVencimento = parseInt(campoVencimentoFatura.value, 10) || null;
+        diaVencimentoFatura = novoVencimento;
+
+        await setDoc(doc(db, "usuarios", uidAtual), { nomeCartao, diaVencimentoFatura }, { merge: true });
+        renderizarFatura();
+        mostrarToast("Configuração salva ✓");
     });
 
     // ==========================================================================
@@ -146,7 +163,7 @@ document.addEventListener("DOMContentLoaded", function () {
             item.innerHTML = `
                 <div class="info-conta">
                     <div class="nome-conta">${dados.descricao}${badge}</div>
-                    <div class="meta-conta">Vence dia ${dados.diaDoMes}${dados.pago ? " · Já paga" : ""}</div>
+                    <div class="meta-conta">${dados.pago ? "Já entrou nessa fatura" : "Entra na próxima fatura"}</div>
                 </div>
                 <span class="valor-conta" style="color: ${dados.pago ? "var(--sucesso)" : "#F5D76E"};">${formatarMoeda(dados.valor)}</span>
                 <button class="botao-excluir-conta" data-id="${documento.id}" aria-label="Excluir item">
@@ -210,6 +227,13 @@ document.addEventListener("DOMContentLoaded", function () {
         totalFaturaEl.textContent = formatarMoeda(totalFatura);
         botaoMarcarFaturaPaga.hidden = faturaEstaPaga || itensDaFatura.length === 0;
         textoFaturaPaga.hidden = !faturaEstaPaga;
+
+        if (diaVencimentoFatura) {
+            textoVencimentoFatura.hidden = false;
+            textoVencimentoFatura.textContent = `Vence todo dia ${diaVencimentoFatura}`;
+        } else {
+            textoVencimentoFatura.hidden = true;
+        }
     }
 
     botaoMarcarFaturaPaga.addEventListener("click", async () => {
@@ -274,8 +298,9 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // ==========================================================================
-    // ADICIONAR ITEM NO CARTÃO — formulário rápido, sem passar pelo fluxo
-    // completo de Gasto/Extra/Guardar
+    // ADICIONAR ITEM NO CARTÃO — formulário rápido: nome, tipo, valor, parcelas
+    // (o vencimento não é mais perguntado aqui — só a Fatura tem um vencimento
+    // de verdade, configurado lá em cima)
     // ==========================================================================
     function atualizarTipoItem() {
         const ehParcelado = tipoItemParcelado.checked;
@@ -290,7 +315,6 @@ document.addEventListener("DOMContentLoaded", function () {
     function abrirModalNovoItem() {
         campoNomeItemCartao.value = "";
         campoValorItemCartao.value = "";
-        campoVencimentoItemCartao.value = "";
         campoParcelasItemCartao.value = "";
         tipoItemFixo.checked = true;
         atualizarTipoItem();
@@ -309,7 +333,6 @@ document.addEventListener("DOMContentLoaded", function () {
     botaoSalvarItemCartao.addEventListener("click", async () => {
         const nome = campoNomeItemCartao.value.trim();
         const valor = paraNumero(campoValorItemCartao.value);
-        const vencimento = parseInt(campoVencimentoItemCartao.value, 10);
         const ehParcelado = tipoItemParcelado.checked;
         const numeroParcelas = ehParcelado ? parseInt(campoParcelasItemCartao.value, 10) : 1;
 
@@ -325,11 +348,6 @@ document.addEventListener("DOMContentLoaded", function () {
             mensagemAvisoItemCartao.classList.add("visivel");
             return;
         }
-        if (!vencimento || vencimento < 1 || vencimento > 31) {
-            mensagemAvisoItemCartao.textContent = "Digita um dia de vencimento válido (1 a 31).";
-            mensagemAvisoItemCartao.classList.add("visivel");
-            return;
-        }
         if (ehParcelado && (!numeroParcelas || numeroParcelas < 2)) {
             mensagemAvisoItemCartao.textContent = "Informa um número de parcelas válido (mínimo 2).";
             mensagemAvisoItemCartao.classList.add("visivel");
@@ -341,6 +359,10 @@ document.addEventListener("DOMContentLoaded", function () {
         spinner.hidden = false;
 
         const hoje = new Date();
+        // O "dia" guardado em cada pendência é só o vencimento da fatura (se
+        // já estiver configurado) — é ele que realmente importa; o item em
+        // si só entra na fatura daquele mês, não tem vencimento próprio
+        const diaParaRegistro = diaVencimentoFatura || 1;
 
         if (ehParcelado) {
             const valorParcela = Math.floor((valor / numeroParcelas) * 100) / 100;
@@ -351,7 +373,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const anoDestino = hoje.getFullYear();
                 const mesDestino = hoje.getMonth() + indice;
                 const ultimoDiaDoMes = new Date(anoDestino, mesDestino + 1, 0).getDate();
-                const diaFinal = Math.min(vencimento, ultimoDiaDoMes);
+                const diaFinal = Math.min(diaParaRegistro, ultimoDiaDoMes);
                 const mesReferencia = mesReferenciaString(new Date(anoDestino, mesDestino, 1));
                 const ehUltima = indice === numeroParcelas - 1;
                 const valorDessaParcela = ehUltima ? valorParcela + diferencaCentavos : valorParcela;
@@ -378,7 +400,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const anoDestino = hoje.getFullYear();
                 const mesDestino = hoje.getMonth() + indice;
                 const ultimoDiaDoMes = new Date(anoDestino, mesDestino + 1, 0).getDate();
-                const diaFinal = Math.min(vencimento, ultimoDiaDoMes);
+                const diaFinal = Math.min(diaParaRegistro, ultimoDiaDoMes);
                 const mesReferencia = mesReferenciaString(new Date(anoDestino, mesDestino, 1));
 
                 await addDoc(collection(db, "usuarios", uidAtual, "pendencias"), {

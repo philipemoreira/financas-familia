@@ -61,7 +61,7 @@ body#pagina-login {
 .tela-carregamento {
     position: fixed;
     inset: 0;
-    background-color: var(--bg-deep);
+    background: radial-gradient(ellipse at center, rgba(217, 119, 87, 0.08) 0%, var(--bg-deep) 65%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -499,11 +499,13 @@ select:focus {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    transition: background-color 0.25s ease, transform 0.15s ease;
+    box-shadow: 0 4px 16px rgba(217, 119, 87, 0.25);
+    transition: background-color 0.25s ease, transform 0.15s ease, box-shadow 0.25s ease;
 }
 
 .botao-enviar:hover {
     background-color: var(--accent-hover);
+    box-shadow: 0 6px 20px rgba(217, 119, 87, 0.35);
 }
 
 .botao-enviar:active {

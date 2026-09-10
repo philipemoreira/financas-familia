@@ -31,18 +31,24 @@
 
         <main class="conteudo-principal">
 
-            <!-- Nome do cartão — direto aqui, sem precisar de modal separado -->
-            <div class="campo-nome-cartao-inline">
-                <label for="campo-nome-cartao">Nome do cartão</label>
-                <div class="campo-nome-cartao-linha">
-                    <input type="text" id="campo-nome-cartao" placeholder="Ex: Nubank, Inter, Itaú...">
-                    <button type="button" class="botao-salvar-inline" id="botao-salvar-nome-cartao">Salvar</button>
+            <!-- Nome do cartão e vencimento da fatura — direto aqui, sem
+                 precisar de modal separado -->
+            <div class="linha-config-cartao">
+                <div class="campo-nome-cartao-inline">
+                    <label for="campo-nome-cartao">Nome do cartão</label>
+                    <input type="text" id="campo-nome-cartao" placeholder="Ex: Nubank, Inter...">
+                </div>
+                <div class="campo-nome-cartao-inline">
+                    <label for="campo-vencimento-fatura">Vence todo dia</label>
+                    <input type="number" id="campo-vencimento-fatura" min="1" max="31" placeholder="Ex: 10">
                 </div>
             </div>
+            <button type="button" class="botao-salvar-inline botao-salvar-inline-largo" id="botao-salvar-config-cartao">Salvar</button>
 
-            <section class="cartao-saldo-principal">
+            <section class="cartao-saldo-principal" style="margin-top: 22px;">
                 <span class="rotulo-cartao">Fatura deste mês</span>
                 <span class="valor-saldo-grande" id="total-fatura">R$ 0,00</span>
+                <span class="texto-vencimento-fatura" id="texto-vencimento-fatura" hidden></span>
                 <button type="button" class="botao-retirar" id="botao-marcar-fatura-paga">Marcar como paga</button>
             </section>
 
@@ -95,11 +101,6 @@
                     <span class="prefixo-valor">R$</span>
                     <input type="text" inputmode="decimal" id="campo-valor-item-cartao" placeholder="0,00">
                 </div>
-            </div>
-
-            <div class="campo">
-                <label for="campo-vencimento-item-cartao">Dia de vencimento</label>
-                <input type="number" id="campo-vencimento-item-cartao" min="1" max="31" placeholder="Ex: 26">
             </div>
 
             <div class="mensagem-aviso" id="mensagem-aviso-item-cartao" role="alert"></div>

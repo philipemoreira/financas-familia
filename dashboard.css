@@ -174,6 +174,12 @@ body {
     max-width: 720px;
     margin: 0 auto;
     padding: 32px 24px 100px 24px;
+    animation: entrada-conteudo 0.4s ease both;
+}
+
+@keyframes entrada-conteudo {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Navegação entre meses */
@@ -238,6 +244,7 @@ body {
     flex-direction: column;
     gap: 8px;
     margin-bottom: 14px;
+    box-shadow: 0 8px 32px rgba(217, 119, 87, 0.1), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 .valor-saldo-grande {
@@ -316,10 +323,21 @@ body {
     gap: 12px;
     padding: 14px 16px;
     border-bottom: 1px solid var(--borda);
+    cursor: pointer;
+    animation: entrada-item-lista 0.3s ease both;
 }
 
 .item-lancamento:last-child {
     border-bottom: none;
+}
+
+.item-lancamento:hover {
+    background-color: var(--surface-alta);
+}
+
+@keyframes entrada-item-lista {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .ponto-categoria {
@@ -355,15 +373,6 @@ body {
     font-size: 12.5px;
     color: var(--text-muted);
     margin-top: 2px;
-}
-
-/* Item da lista fica clicável (abre edição) — só a área do X escapa disso */
-.item-lancamento {
-    cursor: pointer;
-}
-
-.item-lancamento:hover {
-    background-color: var(--surface-alta);
 }
 
 .valor-lancamento {
@@ -869,6 +878,14 @@ body {
     gap: 12px;
 }
 
+/* Com 4 opções (Gasto/Extra/Guardar/Cartão), vira grade 2x2 em vez de
+   espremer tudo numa linha só — fica mais fácil de tocar no celular */
+.botoes-escolha-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
 .botao-escolha-tipo {
     flex: 1;
     padding: 20px 0;
@@ -900,6 +917,11 @@ body {
 .botao-escolha-tipo.escolha-guardar:hover {
     border-color: #60A5FA;
     color: #60A5FA;
+}
+
+.botao-escolha-tipo.escolha-cartao:hover {
+    border-color: #A78BFA;
+    color: #A78BFA;
 }
 
 /* Selo no topo do formulário (etapa 2) mostrando o tipo escolhido, com opção de trocar */
@@ -1095,6 +1117,13 @@ body {
     color: var(--text-primary);
 }
 
+.cartao-resumo-vencimento {
+    display: block;
+    font-size: 11.5px;
+    color: #A78BFA;
+    margin-top: 2px;
+}
+
 .cartao-resumo-seta {
     font-size: 13px;
     font-weight: 600;
@@ -1102,8 +1131,14 @@ body {
     white-space: nowrap;
 }
 
+.linha-config-cartao {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
 .campo-nome-cartao-inline {
-    margin-bottom: 24px;
+    flex: 1;
 }
 
 .campo-nome-cartao-inline label {
@@ -1114,13 +1149,8 @@ body {
     margin-bottom: 8px;
 }
 
-.campo-nome-cartao-linha {
-    display: flex;
-    gap: 8px;
-}
-
-.campo-nome-cartao-linha input {
-    flex: 1;
+.campo-nome-cartao-inline input {
+    width: 100%;
     background-color: var(--surface-alta);
     border: 1px solid var(--borda);
     border-radius: 8px;
@@ -1130,7 +1160,7 @@ body {
     font-size: 14.5px;
 }
 
-.campo-nome-cartao-linha input:focus {
+.campo-nome-cartao-inline input:focus {
     outline: none;
     border-color: var(--accent);
 }
@@ -1150,4 +1180,21 @@ body {
 
 .botao-salvar-inline:hover {
     background-color: var(--accent-hover);
+}
+
+.botao-salvar-inline-largo {
+    width: 100%;
+    padding: 12px 0;
+    margin-bottom: 24px;
+}
+
+.texto-vencimento-fatura {
+    display: block;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.texto-vencimento-fatura[hidden] {
+    display: none;
 }
