@@ -236,7 +236,7 @@ body {
    SALDO EM DESTAQUE
    ========================================================================== */
 .cartao-saldo-principal {
-    background: linear-gradient(160deg, var(--surface) 0%, #1c1410 100%);
+    background: linear-gradient(160deg, var(--surface) 0%, #181818 100%);
     border: 1px solid var(--accent);
     border-radius: 14px;
     padding: 24px;
@@ -464,7 +464,7 @@ body {
    BANNER DE SALÁRIO
    ========================================================================== */
 .banner-salario {
-    background: linear-gradient(160deg, var(--surface) 0%, #1c1410 100%);
+    background: linear-gradient(160deg, var(--surface) 0%, #181818 100%);
     border: 1px solid var(--accent);
     border-radius: 14px;
     padding: 22px;
@@ -1200,7 +1200,7 @@ body {
 }
 
 .fatura-cartao-item {
-    background: linear-gradient(160deg, var(--surface) 0%, #1c1410 100%);
+    background: linear-gradient(160deg, var(--surface) 0%, #181818 100%);
     border: 1px solid var(--borda);
     border-radius: 12px;
     padding: 18px;
