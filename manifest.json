@@ -1,6 +1,6 @@
 {
-  "name": "Finanças",
-  "short_name": "Finanças",
+  "name": "Bull",
+  "short_name": "Bull",
   "description": "Controle de ganhos e gastos do dia a dia da família",
   "start_url": "index.html",
   "scope": ".",

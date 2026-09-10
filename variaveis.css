@@ -8,8 +8,8 @@
     --bg-deep: #0A0A0A;         /* Fundo geral: preto quase puro */
     --surface: #161616;         /* Superfície dos cartões, um tom acima do fundo */
     --surface-alta: #202020;    /* Superfície de inputs/campos, ainda mais clara */
-    --accent: #D97757;          /* Laranja: cor de destaque, botões e detalhes */
-    --accent-hover: #E58A6D;
+    --accent: #FFFFFF;          /* Branco: cor de destaque, botões e detalhes */
+    --accent-hover: #D4D4D4;
     --text-primary: #FFFFFF;    /* Texto principal: branco puro */
     --text-muted: #9A9A9A;      /* Texto secundário: cinza médio */
     --error: #E5484D;           /* Vermelho para erros (diferente do laranja, pra não confundir) */

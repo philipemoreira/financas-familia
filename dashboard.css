@@ -3,8 +3,8 @@
    sem precisar redeclarar nada disso aqui. */
 
 body {
-    background: radial-gradient(circle at 12% 8%, rgba(217, 119, 87, 0.09), transparent 42%),
-                radial-gradient(circle at 88% 92%, rgba(217, 119, 87, 0.07), transparent 40%),
+    background: radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.09), transparent 42%),
+                radial-gradient(circle at 88% 92%, rgba(255, 255, 255, 0.07), transparent 40%),
                 var(--bg-deep);
     min-height: 100vh;
 }
@@ -244,7 +244,7 @@ body {
     flex-direction: column;
     gap: 8px;
     margin-bottom: 14px;
-    box-shadow: 0 8px 32px rgba(217, 119, 87, 0.1), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    box-shadow: 0 8px 32px rgba(255, 255, 255, 0.1), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 .valor-saldo-grande {
@@ -469,7 +469,7 @@ body {
     border-radius: 14px;
     padding: 22px;
     margin-bottom: 24px;
-    box-shadow: 0 8px 24px rgba(217, 119, 87, 0.12);
+    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.12);
 }
 
 .cabecalho-banner-salario {
@@ -612,8 +612,8 @@ body {
 
 .badge-parcela {
     display: inline-block;
-    background-color: rgba(217, 119, 87, 0.15);
-    color: var(--accent);
+    background-color: var(--accent);
+    color: #0A0A0A;
     font-size: 11px;
     font-weight: 700;
     padding: 2px 8px;
@@ -794,7 +794,7 @@ body {
     font-size: 30px;
     line-height: 1;
     cursor: pointer;
-    box-shadow: 0 8px 24px rgba(217, 119, 87, 0.4);
+    box-shadow: 0 8px 24px rgba(255, 255, 255, 0.4);
     transition: background-color 0.25s ease, transform 0.2s ease;
     z-index: 500;
 }
@@ -959,7 +959,7 @@ body {
 
 .valor-wrapper:focus-within {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.18);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
 }
 
 .prefixo-valor {

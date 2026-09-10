@@ -11,7 +11,7 @@ const CATEGORIAS_PADRAO = {
 };
 
 // Cores usadas no gráfico de gastos por categoria (cicla se tiver mais categorias que cores)
-const PALETA_GRAFICO = ["#D97757", "#34D399", "#60A5FA", "#F5D76E", "#C084FC", "#F87171", "#5EEAD4", "#FDBA74"];
+const PALETA_GRAFICO = ["#D4D4D4", "#34D399", "#60A5FA", "#F5D76E", "#C084FC", "#F87171", "#5EEAD4", "#FDBA74"];
 
 const NOMES_MESES = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",

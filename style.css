@@ -61,7 +61,7 @@ body#pagina-login {
 .tela-carregamento {
     position: fixed;
     inset: 0;
-    background: radial-gradient(ellipse at center, rgba(217, 119, 87, 0.08) 0%, var(--bg-deep) 65%);
+    background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.08) 0%, var(--bg-deep) 65%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -138,7 +138,7 @@ body#pagina-login {
 
 @keyframes respirar-ponto-carregamento {
     0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); }
-    50%      { opacity: 0.85; transform: scale(1.15); filter: drop-shadow(0 0 6px rgba(217, 119, 87, 0.6)); }
+    50%      { opacity: 0.85; transform: scale(1.15); filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.6)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -160,7 +160,7 @@ body#pagina-login {
     min-height: 100vh;
     display: grid;
     grid-template-columns: 1.15fr 1fr; /* Marca ganha um pouco mais de espaço, é o "herói" da tela */
-    background: radial-gradient(ellipse 800px 600px at 15% 20%, rgba(217, 119, 87, 0.05), transparent 60%);
+    background: radial-gradient(ellipse 800px 600px at 15% 20%, rgba(255, 255, 255, 0.05), transparent 60%);
 }
 
 /* ==========================================================================
@@ -181,8 +181,8 @@ body#pagina-login {
     content: "";
     position: absolute;
     inset: 0;
-    background-image: radial-gradient(circle at 15% 15%, rgba(217, 119, 87, 0.1), transparent 45%),
-                       radial-gradient(circle at 85% 85%, rgba(217, 119, 87, 0.07), transparent 42%);
+    background-image: radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.1), transparent 45%),
+                       radial-gradient(circle at 85% 85%, rgba(255, 255, 255, 0.07), transparent 42%);
     pointer-events: none;
 }
 
@@ -196,7 +196,7 @@ body#pagina-login {
     width: 480px;
     height: 480px;
     transform: translate(-50%, -50%);
-    background: radial-gradient(circle, rgba(217, 119, 87, 0.06) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
     pointer-events: none;
 }
 
@@ -484,7 +484,7 @@ select:focus {
 .campo input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.18);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
 }
 
 .campo input::placeholder {
@@ -558,13 +558,13 @@ select:focus {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    box-shadow: 0 4px 16px rgba(217, 119, 87, 0.25);
+    box-shadow: 0 4px 16px rgba(255, 255, 255, 0.25);
     transition: background-color 0.25s ease, transform 0.15s ease, box-shadow 0.25s ease;
 }
 
 .botao-enviar:hover {
     background-color: var(--accent-hover);
-    box-shadow: 0 6px 20px rgba(217, 119, 87, 0.35);
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.35);
 }
 
 .botao-enviar:active {
