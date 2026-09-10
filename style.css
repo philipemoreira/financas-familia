@@ -43,13 +43,12 @@ body {
     color: var(--text-primary);
 }
 
-/* Só a tela de login usa esse id — trava o scroll/arraste, deixando a tela
-   fixa. Onboarding e dashboard não usam esse id, então continuam rolando normalmente. */
+/* Só a tela de login usa esse id. "overscroll-behavior: contain" impede o
+   efeito de "arrastar e revelar o fundo" (bounce) no iOS, sem travar a
+   rolagem normal da página — versão mais robusta do que travar o scroll
+   inteiro, que causava sobreposição entre os painéis no celular. */
 body#pagina-login {
-    height: 100vh;
-    overflow: hidden;
-    position: fixed;
-    width: 100%;
+    overscroll-behavior-y: contain;
 }
 
 /* ==========================================================================
@@ -675,14 +674,14 @@ select:focus {
 @media (max-width: 720px) {
     .tela-login {
         grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
-        height: 100vh; /* trava a altura de verdade (não só um mínimo), senão o
-                           painel do formulário nunca fica "pequeno" o bastante
-                           pra precisar rolar internamente */
+        grid-template-rows: auto auto; /* cada painel usa só o espaço que precisa,
+                                           a página inteira rola normal depois */
+        height: auto;
+        min-height: 100vh;
     }
 
     .painel-marca {
-        padding: 36px 24px 28px 24px;
+        padding: 30px 24px 20px 24px;
         min-height: auto;
     }
 
@@ -701,13 +700,12 @@ select:focus {
 
     .grafico-assinatura {
         max-width: 200px;
-        height: 70px;
+        height: auto; /* deixa a proporção do SVG se ajustar sozinha — forçar
+                          uma altura fixa aqui foi o que causava o corte */
     }
 
     .painel-formulario {
         padding: 28px 22px 48px 22px;
-        overflow-y: auto;
-        min-height: 0; /* sem isso, um item de grid não consegue encolher/rolar de verdade */
     }
 
     .cartao-formulario {
