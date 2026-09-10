@@ -55,14 +55,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const listaPendencias = document.getElementById("lista-pendencias");
     const pendenciasVazio = document.getElementById("pendencias-vazio");
     const secaoFaturaCartao = document.getElementById("secao-fatura-cartao");
-    const listaFaturaCartao = document.getElementById("lista-fatura-cartao");
-    const listaCartao = document.getElementById("lista-cartao");
     const tituloFaturaCartao = document.getElementById("titulo-fatura-cartao");
-    const botaoEditarNomeCartao = document.getElementById("botao-editar-nome-cartao");
-    const fundoModalNomeCartao = document.getElementById("fundo-modal-nome-cartao");
-    const botaoFecharNomeCartao = document.getElementById("botao-fechar-nome-cartao");
-    const campoNomeCartao = document.getElementById("campo-nome-cartao");
-    const botaoSalvarNomeCartao = document.getElementById("botao-salvar-nome-cartao");
+    const valorFaturaCartao = document.getElementById("valor-fatura-cartao");
     const linkExtrato = document.getElementById("link-extrato");
 
     const fundoModalEditarCategoria = document.getElementById("fundo-modal-editar-categoria");
@@ -153,9 +147,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const campoFixo = document.getElementById("campo-fixo");
     const campoParcelado = document.getElementById("campo-parcelado");
     const campoVencimentoLancamentoWrapper = document.getElementById("campo-vencimento-lancamento-wrapper");
+    const slotVencimentoFixo = document.getElementById("slot-vencimento-fixo");
+    const slotVencimentoParcelado = document.getElementById("slot-vencimento-parcelado");
     const campoVencimentoLancamento = document.getElementById("campo-vencimento-lancamento");
-    const campoNoCartaoWrapper = document.getElementById("campo-no-cartao-wrapper");
-    const campoNoCartao = document.getElementById("campo-no-cartao");
     const mensagemAviso = document.getElementById("mensagem-aviso-modal");
     const botaoSalvar = document.getElementById("botao-salvar-lancamento");
     const textoBotaoSalvar = botaoSalvar.querySelector(".texto-botao");
@@ -642,8 +636,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const criandoNova = campoCategoria.value === "__nova__";
         campoNovaCategoriaWrapper.hidden = !criandoNova;
         campoNovaCategoria.required = criandoNova;
-        // Vencimento só faz sentido pro lado Gasto (é usado em gasto fixo/parcelado)
-        campoVencimentoNovaCategoriaWrapper.hidden = !criandoNova || tipoSelecionado !== "gasto";
+        // Vencimento da categoria só aparece aqui quando Fixo/Parcelado NÃO
+        // estão marcados — se estiverem, o vencimento já é perguntado uma
+        // vez só ali embaixo (nos checkboxes), pra não duplicar a pergunta
+        const jaPerguntaVencimentoAliBaixo = campoFixo.checked || campoParcelado.checked;
+        campoVencimentoNovaCategoriaWrapper.hidden = !criandoNova || tipoSelecionado !== "gasto" || jaPerguntaVencimentoAliBaixo;
         atualizarBotaoExcluirCategoria();
     });
 
@@ -857,8 +854,6 @@ document.addEventListener("DOMContentLoaded", function () {
         campoVencimentoLancamentoWrapper.hidden = true;
         campoVencimentoLancamento.required = false;
         campoVencimentoLancamento.value = "";
-        campoNoCartaoWrapper.hidden = true;
-        campoNoCartao.checked = false;
         campoBancoWrapper.hidden = true;
         campoNovoBancoWrapper.hidden = true;
         campoNovoBanco.required = false;
@@ -1036,15 +1031,28 @@ document.addEventListener("DOMContentLoaded", function () {
         // separado da "Data" de propósito (Data = quando você registrou;
         // Vencimento = todo dia X do mês). Já vem pré-preenchido com o dia
         // que está na Data agora, só pra facilitar, mas pode ser trocado.
+        // Ele se MOVE pra logo abaixo do checkbox marcado, em vez de ficar
+        // sempre no mesmo lugar (fixo embaixo dos dois checkboxes) — assim
+        // fica claro que é sobre a opção que você acabou de marcar.
         const precisaVencimento = campoFixo.checked || campoParcelado.checked;
         campoVencimentoLancamentoWrapper.hidden = !precisaVencimento;
         campoVencimentoLancamento.required = precisaVencimento;
+
+        if (campoFixo.checked) {
+            slotVencimentoFixo.appendChild(campoVencimentoLancamentoWrapper);
+        } else if (campoParcelado.checked) {
+            slotVencimentoParcelado.appendChild(campoVencimentoLancamentoWrapper);
+        }
+
         if (precisaVencimento && !campoVencimentoLancamento.value) {
             const dataAtual = campoData.value ? new Date(campoData.value + "T00:00:00") : new Date();
             campoVencimentoLancamento.value = dataAtual.getDate();
         }
 
-        campoNoCartaoWrapper.hidden = !precisaVencimento;
+        // Se a categoria nova já estava com o campo de vencimento visível,
+        // esconde ele agora que Fixo/Parcelado já pergunta isso ali embaixo
+        // (evita perguntar o mesmo dia duas vezes, em lugares diferentes)
+        if (precisaVencimento) campoVencimentoNovaCategoriaWrapper.hidden = true;
     }
 
     // Mostra "= 6x de R$ 8,33" em tempo real, assim que a pessoa digita o
@@ -1233,7 +1241,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             if (campoCategoria.value === "__nova__" && !modoGuardar) {
-                const vencimentoNovaCategoria = parseInt(campoVencimentoNovaCategoria.value, 10) || null;
+                // Se for Fixo/Parcelado, usa o mesmo vencimento já perguntado
+                // ali embaixo (não pergunta de novo, os dois ficam sincronizados)
+                const usandoFixoOuParcelado = campoFixo.checked || campoParcelado.checked;
+                const vencimentoNovaCategoria = usandoFixoOuParcelado
+                    ? (parseInt(campoVencimentoLancamento.value, 10) || null)
+                    : (parseInt(campoVencimentoNovaCategoria.value, 10) || null);
                 const referenciaCategoria = await addDoc(collection(db, "usuarios", uidAtual, "categorias"), {
                     nome: categoriaFinal,
                     tipo: tipoSelecionado,
@@ -1260,9 +1273,9 @@ document.addEventListener("DOMContentLoaded", function () {
             const descricaoBase = campoDescricao.value.trim();
 
             if (ehParcelado) {
-                await salvarParcelado(valorDigitado, numeroParcelas, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10), campoNoCartao.checked);
+                await salvarParcelado(valorDigitado, numeroParcelas, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10));
             } else if (campoFixo.checked) {
-                await salvarFixo(valorDigitado, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10), campoNoCartao.checked);
+                await salvarFixo(valorDigitado, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10));
             } else {
                 await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
                     tipo: tipoSelecionado,
@@ -1296,7 +1309,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Cria uma "pendência" por parcela — nenhuma delas mexe no saldo ainda.
     // Só quando a pessoa marcar como paga (lá na seção "Pagamentos Pendentes")
     // é que vira um lançamento de verdade.
-    async function salvarParcelado(valorTotal, numeroParcelas, categoria, descricaoBase, dataInicial, diaVencimento, noCartao) {
+    async function salvarParcelado(valorTotal, numeroParcelas, categoria, descricaoBase, dataInicial, diaVencimento) {
         const valorParcela = Math.floor((valorTotal / numeroParcelas) * 100) / 100;
         const diferencaCentavos = Math.round((valorTotal - valorParcela * numeroParcelas) * 100) / 100;
         const grupoId = `parc_${Date.now()}`;
@@ -1323,14 +1336,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 numeroParcela: indice + 1,
                 totalParcelas: numeroParcelas,
                 grupoId,
-                noCartao: !!noCartao,
+                noCartao: false,
                 pago: false,
                 criadoEm: serverTimestamp()
             });
         }
     }
 
-    async function salvarFixo(valor, categoria, descricaoBase, dataInicial, diaVencimento, noCartao) {
+    async function salvarFixo(valor, categoria, descricaoBase, dataInicial, diaVencimento) {
         const grupoId = `fixo_${Date.now()}`;
         const diaOriginal = diaVencimento || dataInicial.getDate(); // reserva de segurança
 
@@ -1349,7 +1362,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 mesReferencia,
                 origem: "fixo",
                 grupoId,
-                noCartao: !!noCartao,
+                noCartao: false,
                 pago: false,
                 criadoEm: serverTimestamp()
             });
@@ -1458,136 +1471,23 @@ document.addEventListener("DOMContentLoaded", function () {
         return item;
     }
 
-    // Desenha a seção "Fatura do Cartão": os itens individuais (só
-    // informativo) + o card agregado, que é o único com botão de marcar pago
+    // Mostra só um resumo (nome do cartão + valor total da fatura) com link
+    // pra tela própria do Cartão de Crédito, onde toda a gestão acontece —
+    // adicionar item, marcar fatura como paga, editar nome do cartão, etc.
     function renderizarFaturaCartao(pendenciasNoCartao) {
         if (pendenciasNoCartao.length === 0) {
             secaoFaturaCartao.hidden = true;
             return;
         }
         secaoFaturaCartao.hidden = false;
-        atualizarTituloFatura();
-
-        listaCartao.innerHTML = "";
-        pendenciasNoCartao.forEach((documento) => {
-            listaCartao.appendChild(criarItemPendencia(documento, false));
-        });
 
         const itensNaoPagos = pendenciasNoCartao.filter((documento) => !documento.data().pago);
         const faturaEstaPaga = itensNaoPagos.length === 0;
-
         const itensRelevantes = faturaEstaPaga ? pendenciasNoCartao : itensNaoPagos;
         const totalFatura = itensRelevantes.reduce((soma, documento) => soma + documento.data().valor, 0);
 
-        listaFaturaCartao.innerHTML = "";
-        const item = document.createElement("li");
-        item.className = "item-conta";
-        item.innerHTML = `
-            <div class="info-conta">
-                <div class="nome-conta">Fatura do Cartão</div>
-                <div class="meta-conta">${pendenciasNoCartao.length} ${pendenciasNoCartao.length === 1 ? "item" : "itens"} nessa fatura</div>
-            </div>
-            <span class="valor-conta">${formatarMoeda(totalFatura)}</span>
-            <div class="status-conta">
-                <button class="botao-marcar-pago ${faturaEstaPaga ? "pago" : ""}" id="botao-marcar-fatura-paga" data-pago="${faturaEstaPaga}">
-                    ${faturaEstaPaga ? "✓ Paga" : "Marcar como paga"}
-                </button>
-            </div>
-        `;
-        listaFaturaCartao.appendChild(item);
-
-        item.querySelector("#botao-marcar-fatura-paga").addEventListener("click", () => {
-            if (faturaEstaPaga) {
-                desmarcarFaturaComoPaga(pendenciasNoCartao.filter((documento) => documento.data().pago));
-            } else {
-                marcarFaturaComoPaga(itensNaoPagos, totalFatura);
-            }
-        });
-    }
-
-    botaoEditarNomeCartao.addEventListener("click", () => {
-        campoNomeCartao.value = nomeCartao;
-        fundoModalNomeCartao.classList.add("aberto");
-    });
-
-    botaoFecharNomeCartao.addEventListener("click", () => {
-        fundoModalNomeCartao.classList.remove("aberto");
-    });
-
-    fundoModalNomeCartao.addEventListener("click", (evento) => {
-        if (evento.target === fundoModalNomeCartao) fundoModalNomeCartao.classList.remove("aberto");
-    });
-
-    botaoSalvarNomeCartao.addEventListener("click", async () => {
-        const spinner = botaoSalvarNomeCartao.querySelector(".spinner-botao");
-        botaoSalvarNomeCartao.disabled = true;
-        spinner.hidden = false;
-
-        nomeCartao = campoNomeCartao.value.trim();
-        await setDoc(doc(db, "usuarios", uidAtual), { nomeCartao }, { merge: true });
-        atualizarTituloFatura();
-
-        botaoSalvarNomeCartao.disabled = false;
-        spinner.hidden = true;
-        fundoModalNomeCartao.classList.remove("aberto");
-    });
-
-    function atualizarTituloFatura() {
-        tituloFaturaCartao.textContent = nomeCartao ? `Fatura do Cartão — ${nomeCartao}` : "Fatura do Cartão";
-    }
-
-    async function marcarFaturaComoPaga(itensNaoPagos, totalFatura) {
-        const confirmou = await confirmarComTelinha(
-            `Confirma o pagamento da fatura inteira, no valor de ${formatarMoeda(totalFatura)}? Isso desconta o valor total do seu saldo, uma vez só.`,
-            "Pagar fatura do cartão"
-        );
-        if (!confirmou) return;
-
-        const agora = new Date();
-        const novoLancamento = await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
-            tipo: "gasto",
-            valor: totalFatura,
-            categoria: "Fatura do Cartão",
-            descricao: "Fatura do Cartão de Crédito",
-            data: Timestamp.fromDate(agora),
-            mesReferencia: mesReferenciaString(mesSelecionado),
-            criadoEm: serverTimestamp()
-        });
-
-        const lote = writeBatch(db);
-        itensNaoPagos.forEach((documento) => {
-            lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
-                pago: true,
-                lancamentoId: novoLancamento.id,
-                pagoEm: serverTimestamp()
-            });
-        });
-        await lote.commit();
-    }
-
-    async function desmarcarFaturaComoPaga(itensPagos) {
-        const confirmou = await confirmarComTelinha(
-            "Tem certeza de que deseja desmarcar o pagamento dessa fatura? O valor volta pro seu saldo.",
-            "Desmarcar fatura"
-        );
-        if (!confirmou) return;
-
-        // Pode ter mais de um lançamento agregado (ex: pagou parte antes,
-        // parte depois) — pega todos os IDs únicos envolvidos e apaga todos
-        const idsLancamentosUnicos = [...new Set(itensPagos.map((documento) => documento.data().lancamentoId).filter(Boolean))];
-        for (const idLancamento of idsLancamentosUnicos) {
-            await deleteDoc(doc(db, "usuarios", uidAtual, "lancamentos", idLancamento)).catch(() => {});
-        }
-
-        const lote = writeBatch(db);
-        itensPagos.forEach((documento) => {
-            lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
-                pago: false,
-                lancamentoId: null,
-                pagoEm: null
-            });
-        });
-        await lote.commit();
+        tituloFaturaCartao.textContent = nomeCartao ? `Fatura — ${nomeCartao}` : "Fatura do mês";
+        valorFaturaCartao.textContent = formatarMoeda(totalFatura);
     }
 
     // ==========================================================================
@@ -1741,7 +1641,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     listaPendencias.addEventListener("click", handlerCliqueListaPendencias);
-    listaCartao.addEventListener("click", handlerCliqueListaPendencias);
 
     // ==========================================================================
     // COMPARAÇÃO COM O MÊS ANTERIOR

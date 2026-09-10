@@ -42,6 +42,7 @@
                 <span class="email-usuario" id="email-usuario"></span>
             </div>
             <a href="guardado.html" class="botao-encerrar-sessao">Saldo Guardado</a>
+            <a href="cartao.html" class="botao-encerrar-sessao">Cartão de Crédito</a>
             <a href="anotacoes.html" class="botao-encerrar-sessao">Lembretes de Pagamento</a>
             <a href="extrato.html" class="botao-encerrar-sessao">Ver Extrato Completo</a>
             <a href="configuracoes.html" class="botao-encerrar-sessao">Configurações</a>
@@ -126,14 +127,14 @@
                  Cartão", com um botão só de marcar paga pra tudo de uma vez -->
             <!-- ========================================================== -->
             <section class="secao-pendencias" id="secao-fatura-cartao" hidden>
-                <div class="cabecalho-lista-lembretes" style="margin-bottom: 14px;">
-                    <h3 class="titulo-secao" style="margin:0;" id="titulo-fatura-cartao">Fatura do Cartão</h3>
-                    <button type="button" class="link-botao-simples" id="botao-editar-nome-cartao">Editar</button>
-                </div>
-                <ul class="lista-contas" id="lista-fatura-cartao"></ul>
-
-                <p class="titulo-secao" style="font-size: 13px; margin: 18px 0 10px 0; opacity: 0.7;">No cartão (compõe a fatura acima)</p>
-                <ul class="lista-contas" id="lista-cartao"></ul>
+                <h3 class="titulo-secao">Cartão de Crédito</h3>
+                <a href="cartao.html" class="cartao-resumo-link">
+                    <div>
+                        <span class="cartao-resumo-titulo" id="titulo-fatura-cartao">Fatura do Cartão</span>
+                        <span class="cartao-resumo-valor" id="valor-fatura-cartao">R$ 0,00</span>
+                    </div>
+                    <span class="cartao-resumo-seta">Ver detalhes →</span>
+                </a>
             </section>
 
             <section class="lista-lancamentos-secao">
@@ -234,29 +235,25 @@
                 </div>
 
                 <div class="opcoes-especiais-gasto" id="opcoes-especiais-gasto">
-                    <label class="item-checkbox">
-                        <input type="checkbox" id="campo-fixo">
-                        Gasto fixo (cria pendência nos próximos 12 meses)
-                    </label>
-                    <label class="item-checkbox">
-                        <input type="checkbox" id="campo-parcelado">
-                        Parcelar essa compra
-                    </label>
+                    <div>
+                        <label class="item-checkbox">
+                            <input type="checkbox" id="campo-fixo">
+                            Gasto fixo (cria pendência nos próximos 12 meses)
+                        </label>
+                        <div id="slot-vencimento-fixo"></div>
+                    </div>
+                    <div>
+                        <label class="item-checkbox">
+                            <input type="checkbox" id="campo-parcelado">
+                            Parcelar essa compra
+                        </label>
+                        <div id="slot-vencimento-parcelado"></div>
+                    </div>
                 </div>
 
                 <div class="campo" id="campo-vencimento-lancamento-wrapper" hidden>
                     <label for="campo-vencimento-lancamento">Dia de vencimento <span class="dica-campo">(todo mês — diferente da Data acima)</span></label>
                     <input type="number" id="campo-vencimento-lancamento" min="1" max="31" placeholder="Ex: 26">
-                </div>
-
-                <div id="campo-no-cartao-wrapper" hidden>
-                    <label class="item-checkbox">
-                        <input type="checkbox" id="campo-no-cartao">
-                        Está no cartão de crédito
-                    </label>
-                    <p class="texto-explicativo-guardado" style="margin: 6px 0 16px 0; font-size: 12px;">
-                        Não desconta o saldo sozinho — entra somado na "Fatura do Cartão" do mês, e só sai da conta quando você marca a fatura inteira como paga.
-                    </p>
                 </div>
 
                 <div class="mensagem-aviso" id="mensagem-aviso-modal" role="alert"></div>
@@ -305,23 +302,6 @@
 
             <button type="button" class="botao-enviar" id="botao-salvar-editar-categoria">
                 <span class="texto-botao">Salvar alterações</span>
-                <span class="spinner-botao" hidden></span>
-            </button>
-        </div>
-    </div>
-
-    <div class="fundo-modal" id="fundo-modal-nome-cartao">
-        <div class="modal-lancamento">
-            <div class="cabecalho-modal">
-                <h3>Nome do cartão</h3>
-                <button class="botao-fechar-modal" id="botao-fechar-nome-cartao" aria-label="Fechar">✕</button>
-            </div>
-            <div class="campo">
-                <label for="campo-nome-cartao">Onde você paga a fatura</label>
-                <input type="text" id="campo-nome-cartao" placeholder="Ex: Nubank, Inter, Itaú...">
-            </div>
-            <button type="button" class="botao-enviar" id="botao-salvar-nome-cartao">
-                <span class="texto-botao">Salvar</span>
                 <span class="spinner-botao" hidden></span>
             </button>
         </div>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Cartão de Crédito — Finanças</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="variaveis.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="extrato.css">
+    <link rel="stylesheet" href="anotacoes.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0A0A0A">
+    <link rel="apple-touch-icon" href="icone-192.png">
+    <link rel="icon" href="favicon-32.png" sizes="32x32">
+    <link rel="icon" href="favicon-16.png" sizes="16x16">
+</head>
+<body>
+
+    <div class="app-shell">
+        <header class="topo-app">
+            <a href="dashboard.html" class="link-voltar" aria-label="Voltar">←</a>
+            <div class="marca-topo">Cartão de Crédito</div>
+            <span style="width:24px"></span>
+        </header>
+
+        <main class="conteudo-principal">
+
+            <!-- Nome do cartão — direto aqui, sem precisar de modal separado -->
+            <div class="campo-nome-cartao-inline">
+                <label for="campo-nome-cartao">Nome do cartão</label>
+                <div class="campo-nome-cartao-linha">
+                    <input type="text" id="campo-nome-cartao" placeholder="Ex: Nubank, Inter, Itaú...">
+                    <button type="button" class="botao-salvar-inline" id="botao-salvar-nome-cartao">Salvar</button>
+                </div>
+            </div>
+
+            <section class="cartao-saldo-principal">
+                <span class="rotulo-cartao">Fatura deste mês</span>
+                <span class="valor-saldo-grande" id="total-fatura">R$ 0,00</span>
+                <button type="button" class="botao-retirar" id="botao-marcar-fatura-paga">Marcar como paga</button>
+            </section>
+
+            <p class="texto-explicativo-guardado" id="texto-fatura-paga" hidden>
+                ✓ Fatura já paga esse mês. <button type="button" class="link-botao-simples" id="botao-desmarcar-fatura">Desmarcar</button>
+            </p>
+
+            <div class="cabecalho-lista-lembretes" style="margin: 26px 0 14px 0;">
+                <h3 class="titulo-secao" style="margin:0;">Itens da fatura</h3>
+                <button type="button" class="botao-selecionar-lembretes" id="botao-abrir-novo-item">+ Adicionar item</button>
+            </div>
+
+            <ul class="lista-contas" id="lista-itens-cartao"></ul>
+            <p class="lista-vazia" id="itens-cartao-vazio" hidden>Nenhum item cadastrado ainda. Toca em "+ Adicionar item" pra começar.</p>
+        </main>
+    </div>
+
+    <!-- MODAL: adicionar item no cartão -->
+    <div class="fundo-modal" id="fundo-modal-item-cartao">
+        <div class="modal-lancamento">
+            <div class="cabecalho-modal">
+                <h3>Novo item no cartão</h3>
+                <button class="botao-fechar-modal" id="botao-fechar-item-cartao" aria-label="Fechar">✕</button>
+            </div>
+
+            <div class="campo">
+                <label for="campo-nome-item-cartao">Nome</label>
+                <input type="text" id="campo-nome-item-cartao" placeholder="Ex: Academia, Netflix, TV nova...">
+            </div>
+
+            <div class="opcoes-especiais-gasto" id="opcoes-tipo-item-cartao">
+                <label class="item-checkbox">
+                    <input type="radio" name="tipo-item-cartao" id="tipo-item-fixo" checked>
+                    Fixo (repete todo mês)
+                </label>
+                <label class="item-checkbox">
+                    <input type="radio" name="tipo-item-cartao" id="tipo-item-parcelado">
+                    Parcelado (tem fim)
+                </label>
+            </div>
+
+            <div class="campo" id="campo-parcelas-item-cartao-wrapper" hidden>
+                <label for="campo-parcelas-item-cartao">Número de parcelas</label>
+                <input type="number" id="campo-parcelas-item-cartao" min="2" max="48" step="1" placeholder="Ex: 10">
+            </div>
+
+            <div class="campo">
+                <label for="campo-valor-item-cartao" id="rotulo-valor-item-cartao">Valor mensal</label>
+                <div class="valor-wrapper">
+                    <span class="prefixo-valor">R$</span>
+                    <input type="text" inputmode="decimal" id="campo-valor-item-cartao" placeholder="0,00">
+                </div>
+            </div>
+
+            <div class="campo">
+                <label for="campo-vencimento-item-cartao">Dia de vencimento</label>
+                <input type="number" id="campo-vencimento-item-cartao" min="1" max="31" placeholder="Ex: 26">
+            </div>
+
+            <div class="mensagem-aviso" id="mensagem-aviso-item-cartao" role="alert"></div>
+            <button type="button" class="botao-enviar" id="botao-salvar-item-cartao">
+                <span class="texto-botao">Adicionar</span>
+                <span class="spinner-botao" hidden></span>
+            </button>
+        </div>
+    </div>
+
+    <div class="fundo-modal" id="fundo-modal-confirmar">
+        <div class="modal-lancamento">
+            <div class="cabecalho-modal">
+                <h3 id="titulo-modal-confirmar">Confirmar</h3>
+                <button class="botao-fechar-modal" id="botao-fechar-confirmar" aria-label="Fechar">✕</button>
+            </div>
+            <p class="texto-explicativo-guardado" id="texto-modal-confirmar"></p>
+            <button type="button" class="botao-enviar" id="botao-confirmar-acao">Confirmar</button>
+            <button type="button" class="link-botao-simples" id="botao-cancelar-acao" style="display:block; margin: 14px auto 0;">Cancelar</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast" hidden>
+        <span id="toast-mensagem"></span>
+        <button type="button" id="toast-botao-acao" hidden></button>
+    </div>
+
+    <script type="module" src="cartao.js"></script>
+</body>
+</html>
