@@ -60,7 +60,7 @@ body#pagina-login {
 .tela-carregamento {
     position: fixed;
     inset: 0;
-    background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.08) 0%, var(--bg-deep) 65%);
+    background-color: var(--bg-deep);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -88,67 +88,53 @@ body#pagina-login {
     animation: aparecer-selo-carregamento 0.6s ease 0.1s forwards;
 }
 
-.grafico-carregamento {
-    width: 260px;
-    height: auto;
-}
-
-/* A área (gradiente sob a linha) só aparece depois que a linha já começou
-   a se desenhar, dando profundidade sem competir com o traço */
-#area-carregamento {
+/* Barra de progresso — larga o suficiente pra não ficar "sumida" na tela,
+   preenche da esquerda pra direita ao longo dos 12 segundos inteiros */
+.barra-progresso-carregamento {
+    width: 280px;
+    max-width: 70vw;
+    height: 8px;
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    overflow: hidden;
     opacity: 0;
-    animation: aparecer-area-carregamento 2s ease 1.2s forwards;
+    animation: aparecer-selo-carregamento 0.6s ease 0.3s forwards;
 }
 
-/* A linha se desenha UMA VEZ SÓ, devagar — não é mais um loop repetitivo,
-   é uma sequência única que acompanha os 6-7 segundos da tela toda */
-#linha-carregamento {
-    stroke-dasharray: 420;
-    stroke-dashoffset: 420;
-    animation: desenhar-linha-carregamento 4s cubic-bezier(0.65, 0, 0.35, 1) 0.9s forwards;
+.barra-progresso-preenchimento {
+    height: 100%;
+    width: 0%;
+    background-color: #FFFFFF;
+    border-radius: 20px;
+    animation: preencher-barra-carregamento 12s linear forwards;
 }
 
-/* O pontinho só aparece quando a linha termina de desenhar, com uma
-   entrada em "pulo" — depois disso, fica respirando suavemente, dando
-   sensação de assentado e vivo, não de "ainda carregando" */
-.ponto-carregamento {
+.texto-status-carregamento {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0;
     opacity: 0;
-    transform: scale(0.5);
-    animation:
-        aparecer-ponto-carregamento 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 4.9s forwards,
-        respirar-ponto-carregamento 1.8s ease-in-out 5.4s infinite;
+    animation: aparecer-selo-carregamento 0.6s ease 0.5s forwards;
 }
 
 @keyframes aparecer-selo-carregamento {
     to { opacity: 1; }
 }
 
-@keyframes aparecer-area-carregamento {
-    to { opacity: 1; }
-}
-
-@keyframes desenhar-linha-carregamento {
-    to { stroke-dashoffset: 0; }
-}
-
-@keyframes aparecer-ponto-carregamento {
-    to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes respirar-ponto-carregamento {
-    0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); }
-    50%      { opacity: 0.85; transform: scale(1.15); filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.6)); }
+@keyframes preencher-barra-carregamento {
+    to { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    #linha-carregamento,
-    #area-carregamento,
-    .ponto-carregamento,
+    .barra-progresso-preenchimento {
+        animation: none !important;
+        width: 100%;
+    }
+    .barra-progresso-carregamento,
+    .texto-status-carregamento,
     .selo-marca-carregamento {
         animation: none !important;
         opacity: 1;
-        stroke-dashoffset: 0;
-        transform: none;
     }
 }
 
@@ -160,6 +146,13 @@ body#pagina-login {
     display: grid;
     grid-template-columns: 1.15fr 1fr; /* Marca ganha um pouco mais de espaço, é o "herói" da tela */
     background: radial-gradient(ellipse 800px 600px at 15% 20%, rgba(255, 255, 255, 0.05), transparent 60%);
+}
+
+/* No desktop, o envelope "desaparece" do layout — os dois painéis continuam
+   sendo tratados como filhos diretos do grid acima, exatamente como antes.
+   Só no celular ele ganha vida própria (vira o carrossel deslizante). */
+.paginas-login-wrapper {
+    display: contents;
 }
 
 /* ==========================================================================
@@ -246,8 +239,11 @@ body#pagina-login {
 }
 
 /* Botões da etapa "Começar/Voltar" — só existem no celular. No desktop os
-   dois painéis já ficam visíveis ao mesmo tempo, essa etapa não faz sentido */
-.botao-comecar,
+   dois painéis já ficam visíveis ao mesmo tempo, essa etapa não faz sentido.
+   Usa o seletor combinado (.botao-enviar.botao-comecar) porque o botão tem
+   as duas classes juntas — isso garante prioridade sobre ".botao-enviar"
+   sozinho, não importa a ordem das regras no arquivo. */
+.botao-enviar.botao-comecar,
 .botao-voltar-login {
     display: none;
 }
@@ -255,7 +251,7 @@ body#pagina-login {
 /* Gráfico assinatura: a linha some e se desenha sozinha ao carregar a página */
 .grafico-assinatura {
     width: 100%;
-    max-width: 320px;
+    max-width: 400px;
     height: auto;
 }
 
@@ -671,7 +667,7 @@ select:focus {
     }
 
     .grafico-assinatura {
-        max-width: 260px;
+        max-width: 340px;
     }
 }
 
@@ -680,24 +676,41 @@ select:focus {
    ========================================================================== */
 @media (max-width: 720px) {
     .tela-login {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto; /* cada painel usa só o espaço que precisa,
-                                           a página inteira rola normal depois */
+        display: block;
+        position: relative;
+        overflow: hidden; /* esconde a "página" que está fora da tela durante o slide */
         height: auto;
         min-height: 100vh;
     }
 
+    /* O envelope vira o "trilho" do slide: duas páginas lado a lado (200%
+       de largura), e a gente desliza ele pra esquerda/direita trocando
+       o transform — muito mais suave que só trocar display na hora */
+    .paginas-login-wrapper {
+        display: flex;
+        width: 200%;
+        transition: transform 0.45s cubic-bezier(0.65, 0, 0.35, 1);
+    }
+
+    .tela-login.mostrar-formulario .paginas-login-wrapper {
+        transform: translateX(-50%);
+    }
+
+    .painel-marca,
+    .painel-formulario {
+        width: 50%;
+        flex-shrink: 0;
+        box-sizing: border-box;
+        min-height: 100vh; /* cada etapa preenche a tela toda — fica com
+                               cara de tela de abertura de verdade, centralizada */
+    }
+
     .painel-marca {
-        padding: 30px 24px 20px 24px;
-        min-height: auto;
+        padding: 24px;
     }
 
     .conteudo-marca {
         max-width: 100%;
-    }
-
-    .titulo-marca {
-        font-size: 26px;
     }
 
     .texto-marca {
@@ -706,29 +719,12 @@ select:focus {
     }
 
     .grafico-assinatura {
-        max-width: 200px;
+        max-width: 300px;
         height: auto; /* deixa a proporção do SVG se ajustar sozinha — forçar
                           uma altura fixa aqui foi o que causava o corte */
     }
 
-    /* Fluxo em 2 etapas, só no celular: por padrão mostra a marca com o
-       botão "Começar"; ao tocar, uma classe no .tela-login troca pra
-       mostrar o formulário — resolve o problema de ter conteúdo demais
-       pra caber numa tela só, sem cortar nada */
-    .painel-formulario {
-        display: none;
-        padding: 28px 22px 48px 22px;
-    }
-
-    .tela-login.mostrar-formulario .painel-marca {
-        display: none;
-    }
-
-    .tela-login.mostrar-formulario .painel-formulario {
-        display: flex;
-    }
-
-    .botao-comecar {
+    .botao-enviar.botao-comecar {
         display: flex;
         margin-top: 32px;
     }
@@ -743,6 +739,10 @@ select:focus {
         cursor: pointer;
         padding: 0;
         margin-bottom: 20px;
+    }
+
+    .painel-formulario {
+        padding: 28px 22px 48px 22px;
     }
 
     .cartao-formulario {

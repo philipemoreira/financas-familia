@@ -39,8 +39,8 @@ document.addEventListener("DOMContentLoaded", function () {
     // ruim, Firebase fora do ar, etc.), o TEMPO_MAXIMO_SEGURANCA garante que
     // ela some sozinha de qualquer jeito — nunca mais fica travada pra sempre.
     // ==========================================================================
-    const TEMPO_MINIMO_VISIVEL = 6500;  // a tela de carregamento fica visível por esse tempo, de propósito
-    const TEMPO_MAXIMO_SEGURANCA = 8000; // rede de segurança: nunca passa disso, mesmo com internet ruim
+    const TEMPO_MINIMO_VISIVEL = 12000; // a tela de carregamento fica visível por esse tempo, de propósito
+    const TEMPO_MAXIMO_SEGURANCA = 13500; // rede de segurança: nunca passa disso, mesmo com internet ruim
     const inicioCarregamento = Date.now();
     let splashJaEscondida = false;
 
@@ -55,6 +55,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Rede de segurança: dispara sozinha, independente de qualquer outra coisa
     setTimeout(esconderSplash, TEMPO_MAXIMO_SEGURANCA);
+
+    // Troca o texto embaixo da barra em alguns momentos, pra dar sensação
+    // de progresso de verdade ao longo dos 12 segundos (em vez de uma
+    // frase parada o tempo todo)
+    const textoStatusCarregamento = document.getElementById("texto-status-carregamento");
+    if (textoStatusCarregamento) {
+        setTimeout(() => { textoStatusCarregamento.textContent = "Organizando suas finanças"; }, 4000);
+        setTimeout(() => { textoStatusCarregamento.textContent = "Quase lá"; }, 9000);
+    }
 
     let modoAtual = "entrar";
 
@@ -81,15 +90,24 @@ document.addEventListener("DOMContentLoaded", function () {
     abaCadastro.addEventListener("click", () => mudarPara("cadastro"));
 
     // Fluxo em 2 etapas, só existe visualmente no celular (o CSS ignora isso
-    // no desktop, onde os dois painéis já ficam visíveis ao mesmo tempo)
+    // no desktop, onde os dois painéis já ficam visíveis ao mesmo tempo).
+    // "inert" impede a pessoa de navegar por Tab pro painel que está fora
+    // da tela — sem isso, o teclado "vazaria" pro conteúdo escondido.
+    const painelMarcaLogin = document.querySelector(".painel-marca");
+    const painelFormularioLogin = document.querySelector(".painel-formulario");
+
     if (botaoComecar && telaLogin) {
         botaoComecar.addEventListener("click", () => {
             telaLogin.classList.add("mostrar-formulario");
+            if (painelMarcaLogin) painelMarcaLogin.inert = true;
+            if (painelFormularioLogin) painelFormularioLogin.inert = false;
         });
     }
     if (botaoVoltarLogin && telaLogin) {
         botaoVoltarLogin.addEventListener("click", () => {
             telaLogin.classList.remove("mostrar-formulario");
+            if (painelMarcaLogin) painelMarcaLogin.inert = false;
+            if (painelFormularioLogin) painelFormularioLogin.inert = true;
         });
     }
 
