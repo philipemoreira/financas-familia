@@ -206,26 +206,26 @@ body#pagina-login {
 }
 
 .selo-marca {
-    display: inline-block;
-    font-family: var(--fonte-corpo);
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 28px;
+    display: block;
+    font-family: var(--fonte-titulo);
+    font-size: clamp(48px, 6vw, 72px);
+    font-weight: 600;
+    letter-spacing: -1px;
+    line-height: 1;
+    color: var(--text-primary);
+    margin-bottom: 24px;
     opacity: 0;
     animation: entrada-marca-login 0.6s ease 0.1s forwards;
 }
 
 .titulo-marca {
     font-family: var(--fonte-titulo);
-    font-size: clamp(36px, 3.6vw, 52px);
-    font-weight: 600;
-    line-height: 1.15;
-    letter-spacing: -0.5px;
+    font-size: clamp(24px, 2.4vw, 32px);
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.3px;
     margin: 0 0 22px 0;
-    color: var(--text-primary);
+    color: var(--text-muted);
     opacity: 0;
     animation: entrada-marca-login 0.6s ease 0.25s forwards;
 }
@@ -243,6 +243,13 @@ body#pagina-login {
     max-width: 90%;
     opacity: 0;
     animation: entrada-marca-login 0.6s ease 0.4s forwards;
+}
+
+/* Botões da etapa "Começar/Voltar" — só existem no celular. No desktop os
+   dois painéis já ficam visíveis ao mesmo tempo, essa etapa não faz sentido */
+.botao-comecar,
+.botao-voltar-login {
+    display: none;
 }
 
 /* Gráfico assinatura: a linha some e se desenha sozinha ao carregar a página */
@@ -704,8 +711,38 @@ select:focus {
                           uma altura fixa aqui foi o que causava o corte */
     }
 
+    /* Fluxo em 2 etapas, só no celular: por padrão mostra a marca com o
+       botão "Começar"; ao tocar, uma classe no .tela-login troca pra
+       mostrar o formulário — resolve o problema de ter conteúdo demais
+       pra caber numa tela só, sem cortar nada */
     .painel-formulario {
+        display: none;
         padding: 28px 22px 48px 22px;
+    }
+
+    .tela-login.mostrar-formulario .painel-marca {
+        display: none;
+    }
+
+    .tela-login.mostrar-formulario .painel-formulario {
+        display: flex;
+    }
+
+    .botao-comecar {
+        display: flex;
+        margin-top: 32px;
+    }
+
+    .botao-voltar-login {
+        display: block;
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 14px;
+        font-family: var(--fonte-corpo);
+        cursor: pointer;
+        padding: 0;
+        margin-bottom: 20px;
     }
 
     .cartao-formulario {

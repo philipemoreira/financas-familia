@@ -70,6 +70,10 @@
                     <circle class="ponto-grafico ponto-3" cx="210" cy="45" r="4" fill="#FFFFFF"/>
                     <circle class="ponto-grafico ponto-4" cx="310" cy="20" r="5" fill="#FFFFFF"/>
                 </svg>
+
+                <!-- Só aparece no celular — no desktop os dois painéis já
+                     ficam visíveis ao mesmo tempo, não precisa dessa etapa -->
+                <button type="button" class="botao-enviar botao-comecar" id="botao-comecar">Começar</button>
             </div>
         </div>
 
@@ -78,6 +82,9 @@
         <!-- ========================================================== -->
         <div class="painel-formulario">
             <div class="cartao-formulario">
+
+                <!-- Só aparece no celular, junto com a etapa "Começar" -->
+                <button type="button" class="botao-voltar-login" id="botao-voltar-login" aria-label="Voltar">← Voltar</button>
 
                 <!-- Abas para alternar entre Entrar e Criar conta -->
                 <div class="abas-acesso" role="tablist">

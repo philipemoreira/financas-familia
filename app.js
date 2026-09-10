@@ -14,6 +14,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const abaEntrar = document.getElementById("aba-entrar");
     const abaCadastro = document.getElementById("aba-cadastro");
+    const telaLogin = document.querySelector(".tela-login");
+    const botaoComecar = document.getElementById("botao-comecar");
+    const botaoVoltarLogin = document.getElementById("botao-voltar-login");
     const campoConfirmar = document.getElementById("campo-confirmar");
     const campoConfirmarSenha = document.getElementById("campo-confirmar-senha");
     const formulario = document.getElementById("formulario-acesso");
@@ -76,6 +79,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
     abaEntrar.addEventListener("click", () => mudarPara("entrar"));
     abaCadastro.addEventListener("click", () => mudarPara("cadastro"));
+
+    // Fluxo em 2 etapas, só existe visualmente no celular (o CSS ignora isso
+    // no desktop, onde os dois painéis já ficam visíveis ao mesmo tempo)
+    if (botaoComecar && telaLogin) {
+        botaoComecar.addEventListener("click", () => {
+            telaLogin.classList.add("mostrar-formulario");
+        });
+    }
+    if (botaoVoltarLogin && telaLogin) {
+        botaoVoltarLogin.addEventListener("click", () => {
+            telaLogin.classList.remove("mostrar-formulario");
+        });
+    }
 
     botaoOlho.addEventListener("click", () => {
         const estaEscondida = campoSenha.type === "password";
