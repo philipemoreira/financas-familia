@@ -54,6 +54,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const listaVazia = document.getElementById("lista-vazia");
     const listaPendencias = document.getElementById("lista-pendencias");
     const pendenciasVazio = document.getElementById("pendencias-vazio");
+    const secaoFaturaCartao = document.getElementById("secao-fatura-cartao");
+    const listaFaturaCartao = document.getElementById("lista-fatura-cartao");
+    const listaCartao = document.getElementById("lista-cartao");
+    const tituloFaturaCartao = document.getElementById("titulo-fatura-cartao");
+    const botaoEditarNomeCartao = document.getElementById("botao-editar-nome-cartao");
+    const fundoModalNomeCartao = document.getElementById("fundo-modal-nome-cartao");
+    const botaoFecharNomeCartao = document.getElementById("botao-fechar-nome-cartao");
+    const campoNomeCartao = document.getElementById("campo-nome-cartao");
+    const botaoSalvarNomeCartao = document.getElementById("botao-salvar-nome-cartao");
     const linkExtrato = document.getElementById("link-extrato");
 
     const fundoModalEditarCategoria = document.getElementById("fundo-modal-editar-categoria");
@@ -145,6 +154,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const campoParcelado = document.getElementById("campo-parcelado");
     const campoVencimentoLancamentoWrapper = document.getElementById("campo-vencimento-lancamento-wrapper");
     const campoVencimentoLancamento = document.getElementById("campo-vencimento-lancamento");
+    const campoNoCartaoWrapper = document.getElementById("campo-no-cartao-wrapper");
+    const campoNoCartao = document.getElementById("campo-no-cartao");
     const mensagemAviso = document.getElementById("mensagem-aviso-modal");
     const botaoSalvar = document.getElementById("botao-salvar-lancamento");
     const textoBotaoSalvar = botaoSalvar.querySelector(".texto-botao");
@@ -187,6 +198,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let pararDeEscutar = null;
     let pararDeEscutarSalario = null;
     let salarioPadrao = 0;
+    let nomeCartao = "";
     let mapaOrcamentos = {}; // {categoria: limite}
     let primeiroNome = "";
     let idEmEdicao = null; // null = criando novo | string = editando esse lançamento
@@ -214,6 +226,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const perfil = perfilSnapshot.data();
         primeiroNome = (perfil.nome || "").trim().split(" ")[0] || "";
         salarioPadrao = perfil.salarioPadrao || 0;
+        nomeCartao = perfil.nomeCartao || "";
 
         // Pro perfil Diarista, o botão do meio continua mostrando "Ganho";
         // pra todo mundo, mostra "Extra"
@@ -844,6 +857,8 @@ document.addEventListener("DOMContentLoaded", function () {
         campoVencimentoLancamentoWrapper.hidden = true;
         campoVencimentoLancamento.required = false;
         campoVencimentoLancamento.value = "";
+        campoNoCartaoWrapper.hidden = true;
+        campoNoCartao.checked = false;
         campoBancoWrapper.hidden = true;
         campoNovoBancoWrapper.hidden = true;
         campoNovoBanco.required = false;
@@ -1028,6 +1043,8 @@ document.addEventListener("DOMContentLoaded", function () {
             const dataAtual = campoData.value ? new Date(campoData.value + "T00:00:00") : new Date();
             campoVencimentoLancamento.value = dataAtual.getDate();
         }
+
+        campoNoCartaoWrapper.hidden = !precisaVencimento;
     }
 
     // Mostra "= 6x de R$ 8,33" em tempo real, assim que a pessoa digita o
@@ -1243,9 +1260,9 @@ document.addEventListener("DOMContentLoaded", function () {
             const descricaoBase = campoDescricao.value.trim();
 
             if (ehParcelado) {
-                await salvarParcelado(valorDigitado, numeroParcelas, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10));
+                await salvarParcelado(valorDigitado, numeroParcelas, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10), campoNoCartao.checked);
             } else if (campoFixo.checked) {
-                await salvarFixo(valorDigitado, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10));
+                await salvarFixo(valorDigitado, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10), campoNoCartao.checked);
             } else {
                 await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
                     tipo: tipoSelecionado,
@@ -1279,7 +1296,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Cria uma "pendência" por parcela — nenhuma delas mexe no saldo ainda.
     // Só quando a pessoa marcar como paga (lá na seção "Pagamentos Pendentes")
     // é que vira um lançamento de verdade.
-    async function salvarParcelado(valorTotal, numeroParcelas, categoria, descricaoBase, dataInicial, diaVencimento) {
+    async function salvarParcelado(valorTotal, numeroParcelas, categoria, descricaoBase, dataInicial, diaVencimento, noCartao) {
         const valorParcela = Math.floor((valorTotal / numeroParcelas) * 100) / 100;
         const diferencaCentavos = Math.round((valorTotal - valorParcela * numeroParcelas) * 100) / 100;
         const grupoId = `parc_${Date.now()}`;
@@ -1306,13 +1323,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 numeroParcela: indice + 1,
                 totalParcelas: numeroParcelas,
                 grupoId,
+                noCartao: !!noCartao,
                 pago: false,
                 criadoEm: serverTimestamp()
             });
         }
     }
 
-    async function salvarFixo(valor, categoria, descricaoBase, dataInicial, diaVencimento) {
+    async function salvarFixo(valor, categoria, descricaoBase, dataInicial, diaVencimento, noCartao) {
         const grupoId = `fixo_${Date.now()}`;
         const diaOriginal = diaVencimento || dataInicial.getDate(); // reserva de segurança
 
@@ -1331,6 +1349,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 mesReferencia,
                 origem: "fixo",
                 grupoId,
+                noCartao: !!noCartao,
                 pago: false,
                 criadoEm: serverTimestamp()
             });
@@ -1357,6 +1376,17 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function renderizarPendencias(documentos) {
+        // Separa em dois grupos: pendências normais (continuam do jeito de
+        // sempre) e as que estão "No Cartão" (não têm botão de marcar pago
+        // individual — só a Fatura inteira pode ser marcada como paga)
+        const pendenciasNormais = documentos.filter((documento) => !documento.data().noCartao);
+        const pendenciasNoCartao = documentos.filter((documento) => documento.data().noCartao);
+
+        renderizarListaPendenciasNormais(pendenciasNormais);
+        renderizarFaturaCartao(pendenciasNoCartao);
+    }
+
+    function renderizarListaPendenciasNormais(documentos) {
         listaPendencias.innerHTML = "";
         pendenciasVazio.hidden = documentos.length > 0;
 
@@ -1369,62 +1399,195 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         documentosOrdenados.forEach((documento) => {
-            const dados = documento.data();
-            const parcelasRestantes = dados.origem === "parcelado" ? dados.totalParcelas - dados.numeroParcela : null;
-            const badgeParcela = dados.origem === "parcelado"
-                ? `<span class="badge-parcela">Parcela ${dados.numeroParcela}/${dados.totalParcelas}</span>`
-                : `<span class="badge-parcela">Fixo</span>`;
-
-            // Avisa quando o parcelamento está quase no fim (falta 1 ou 2
-            // parcelas), pra pessoa já se preparar que o orçamento vai
-            // "sobrar" em breve, ou lembrar de renovar algo
-            const badgeQuaseAcabando = (parcelasRestantes !== null && parcelasRestantes <= 1)
-                ? `<span class="badge-parcela badge-quase-acabando">Quase acabando!</span>`
-                : "";
-
-            // Se já foi paga, mostra quando exatamente isso aconteceu — o campo
-            // pagoEm só existe a partir de agora; pendências marcadas como pagas
-            // antes dessa atualização simplesmente não mostram essa linha
-            let textoPagoEm = "";
-            if (dados.pago && dados.pagoEm) {
-                const dataPagamento = dados.pagoEm.toDate();
-                const dataFormatadaPagamento = dataPagamento.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-                const horaFormatadaPagamento = dataPagamento.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-                textoPagoEm = `<div class="texto-pago-em">Pago em ${dataFormatadaPagamento} às ${horaFormatadaPagamento}</div>`;
-            }
-
-            // Mostra o valor total da compra, não só o da parcela — usa o
-            // valor exato guardado (valorTotalCompra), ou faz uma aproximação
-            // multiplicando pra pendências criadas antes desse campo existir
-            let textoValorTotal = "";
-            if (dados.origem === "parcelado") {
-                const totalDaCompra = dados.valorTotalCompra ?? (dados.valor * dados.totalParcelas);
-                textoValorTotal = `<div class="texto-pago-em" style="color: var(--text-muted);">Total da compra: ${formatarMoeda(totalDaCompra)}</div>`;
-            }
-
-            const item = document.createElement("li");
-            item.className = "item-conta";
-            item.innerHTML = `
-                <div class="info-conta">
-                    <div class="nome-conta">${dados.descricao}${badgeParcela}${badgeQuaseAcabando}</div>
-                    <div class="meta-conta">${dados.categoria} · Vence dia ${dados.diaDoMes}</div>
-                    ${textoValorTotal}
-                    ${textoPagoEm}
-                </div>
-                <span class="valor-conta">${formatarMoeda(dados.valor)}</span>
-                <div class="status-conta">
-                    <button class="botao-marcar-pago ${dados.pago ? "pago" : ""}" data-id="${documento.id}" data-pago="${dados.pago}">
-                        ${dados.pago ? "✓ Paga" : "Marcar como paga"}
-                    </button>
-                    <button class="botao-excluir-conta" data-id="${documento.id}" aria-label="Excluir pendência">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/>
-                        </svg>
-                    </button>
-                </div>
-            `;
-            listaPendencias.appendChild(item);
+            listaPendencias.appendChild(criarItemPendencia(documento, true));
         });
+    }
+
+    // Monta o <li> de uma pendência. mostrarBotaoPago=false esconde o botão
+    // "Marcar como paga" — usado pros itens "No Cartão", que só são pagos
+    // em bloco, através da Fatura
+    function criarItemPendencia(documento, mostrarBotaoPago) {
+        const dados = documento.data();
+        const parcelasRestantes = dados.origem === "parcelado" ? dados.totalParcelas - dados.numeroParcela : null;
+        const badgeParcela = dados.origem === "parcelado"
+            ? `<span class="badge-parcela">Parcela ${dados.numeroParcela}/${dados.totalParcelas}</span>`
+            : `<span class="badge-parcela">Fixo</span>`;
+
+        const badgeQuaseAcabando = (parcelasRestantes !== null && parcelasRestantes <= 1)
+            ? `<span class="badge-parcela badge-quase-acabando">Quase acabando!</span>`
+            : "";
+
+        let textoPagoEm = "";
+        if (dados.pago && dados.pagoEm) {
+            const dataPagamento = dados.pagoEm.toDate();
+            const dataFormatadaPagamento = dataPagamento.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+            const horaFormatadaPagamento = dataPagamento.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+            textoPagoEm = `<div class="texto-pago-em">Pago em ${dataFormatadaPagamento} às ${horaFormatadaPagamento}</div>`;
+        }
+
+        let textoValorTotal = "";
+        if (dados.origem === "parcelado") {
+            const totalDaCompra = dados.valorTotalCompra ?? (dados.valor * dados.totalParcelas);
+            textoValorTotal = `<div class="texto-pago-em" style="color: var(--text-muted);">Total da compra: ${formatarMoeda(totalDaCompra)}</div>`;
+        }
+
+        const botaoPagoHtml = mostrarBotaoPago ? `
+                <button class="botao-marcar-pago ${dados.pago ? "pago" : ""}" data-id="${documento.id}" data-pago="${dados.pago}">
+                    ${dados.pago ? "✓ Paga" : "Marcar como paga"}
+                </button>` : "";
+
+        const item = document.createElement("li");
+        item.className = "item-conta";
+        item.innerHTML = `
+            <div class="info-conta">
+                <div class="nome-conta">${dados.descricao}${badgeParcela}${badgeQuaseAcabando}</div>
+                <div class="meta-conta">${dados.categoria} · Vence dia ${dados.diaDoMes}</div>
+                ${textoValorTotal}
+                ${textoPagoEm}
+            </div>
+            <span class="valor-conta">${formatarMoeda(dados.valor)}</span>
+            <div class="status-conta">
+                ${botaoPagoHtml}
+                <button class="botao-excluir-conta" data-id="${documento.id}" aria-label="Excluir pendência">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/>
+                    </svg>
+                </button>
+            </div>
+        `;
+        return item;
+    }
+
+    // Desenha a seção "Fatura do Cartão": os itens individuais (só
+    // informativo) + o card agregado, que é o único com botão de marcar pago
+    function renderizarFaturaCartao(pendenciasNoCartao) {
+        if (pendenciasNoCartao.length === 0) {
+            secaoFaturaCartao.hidden = true;
+            return;
+        }
+        secaoFaturaCartao.hidden = false;
+        atualizarTituloFatura();
+
+        listaCartao.innerHTML = "";
+        pendenciasNoCartao.forEach((documento) => {
+            listaCartao.appendChild(criarItemPendencia(documento, false));
+        });
+
+        const itensNaoPagos = pendenciasNoCartao.filter((documento) => !documento.data().pago);
+        const faturaEstaPaga = itensNaoPagos.length === 0;
+
+        const itensRelevantes = faturaEstaPaga ? pendenciasNoCartao : itensNaoPagos;
+        const totalFatura = itensRelevantes.reduce((soma, documento) => soma + documento.data().valor, 0);
+
+        listaFaturaCartao.innerHTML = "";
+        const item = document.createElement("li");
+        item.className = "item-conta";
+        item.innerHTML = `
+            <div class="info-conta">
+                <div class="nome-conta">Fatura do Cartão</div>
+                <div class="meta-conta">${pendenciasNoCartao.length} ${pendenciasNoCartao.length === 1 ? "item" : "itens"} nessa fatura</div>
+            </div>
+            <span class="valor-conta">${formatarMoeda(totalFatura)}</span>
+            <div class="status-conta">
+                <button class="botao-marcar-pago ${faturaEstaPaga ? "pago" : ""}" id="botao-marcar-fatura-paga" data-pago="${faturaEstaPaga}">
+                    ${faturaEstaPaga ? "✓ Paga" : "Marcar como paga"}
+                </button>
+            </div>
+        `;
+        listaFaturaCartao.appendChild(item);
+
+        item.querySelector("#botao-marcar-fatura-paga").addEventListener("click", () => {
+            if (faturaEstaPaga) {
+                desmarcarFaturaComoPaga(pendenciasNoCartao.filter((documento) => documento.data().pago));
+            } else {
+                marcarFaturaComoPaga(itensNaoPagos, totalFatura);
+            }
+        });
+    }
+
+    botaoEditarNomeCartao.addEventListener("click", () => {
+        campoNomeCartao.value = nomeCartao;
+        fundoModalNomeCartao.classList.add("aberto");
+    });
+
+    botaoFecharNomeCartao.addEventListener("click", () => {
+        fundoModalNomeCartao.classList.remove("aberto");
+    });
+
+    fundoModalNomeCartao.addEventListener("click", (evento) => {
+        if (evento.target === fundoModalNomeCartao) fundoModalNomeCartao.classList.remove("aberto");
+    });
+
+    botaoSalvarNomeCartao.addEventListener("click", async () => {
+        const spinner = botaoSalvarNomeCartao.querySelector(".spinner-botao");
+        botaoSalvarNomeCartao.disabled = true;
+        spinner.hidden = false;
+
+        nomeCartao = campoNomeCartao.value.trim();
+        await setDoc(doc(db, "usuarios", uidAtual), { nomeCartao }, { merge: true });
+        atualizarTituloFatura();
+
+        botaoSalvarNomeCartao.disabled = false;
+        spinner.hidden = true;
+        fundoModalNomeCartao.classList.remove("aberto");
+    });
+
+    function atualizarTituloFatura() {
+        tituloFaturaCartao.textContent = nomeCartao ? `Fatura do Cartão — ${nomeCartao}` : "Fatura do Cartão";
+    }
+
+    async function marcarFaturaComoPaga(itensNaoPagos, totalFatura) {
+        const confirmou = await confirmarComTelinha(
+            `Confirma o pagamento da fatura inteira, no valor de ${formatarMoeda(totalFatura)}? Isso desconta o valor total do seu saldo, uma vez só.`,
+            "Pagar fatura do cartão"
+        );
+        if (!confirmou) return;
+
+        const agora = new Date();
+        const novoLancamento = await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
+            tipo: "gasto",
+            valor: totalFatura,
+            categoria: "Fatura do Cartão",
+            descricao: "Fatura do Cartão de Crédito",
+            data: Timestamp.fromDate(agora),
+            mesReferencia: mesReferenciaString(mesSelecionado),
+            criadoEm: serverTimestamp()
+        });
+
+        const lote = writeBatch(db);
+        itensNaoPagos.forEach((documento) => {
+            lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
+                pago: true,
+                lancamentoId: novoLancamento.id,
+                pagoEm: serverTimestamp()
+            });
+        });
+        await lote.commit();
+    }
+
+    async function desmarcarFaturaComoPaga(itensPagos) {
+        const confirmou = await confirmarComTelinha(
+            "Tem certeza de que deseja desmarcar o pagamento dessa fatura? O valor volta pro seu saldo.",
+            "Desmarcar fatura"
+        );
+        if (!confirmou) return;
+
+        // Pode ter mais de um lançamento agregado (ex: pagou parte antes,
+        // parte depois) — pega todos os IDs únicos envolvidos e apaga todos
+        const idsLancamentosUnicos = [...new Set(itensPagos.map((documento) => documento.data().lancamentoId).filter(Boolean))];
+        for (const idLancamento of idsLancamentosUnicos) {
+            await deleteDoc(doc(db, "usuarios", uidAtual, "lancamentos", idLancamento)).catch(() => {});
+        }
+
+        const lote = writeBatch(db);
+        itensPagos.forEach((documento) => {
+            lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
+                pago: false,
+                lancamentoId: null,
+                pagoEm: null
+            });
+        });
+        await lote.commit();
     }
 
     // ==========================================================================
@@ -1509,7 +1672,7 @@ document.addEventListener("DOMContentLoaded", function () {
         fecharModalExcluirPendencia();
     });
 
-    listaPendencias.addEventListener("click", async (evento) => {
+    async function handlerCliqueListaPendencias(evento) {
         const botaoExcluir = evento.target.closest(".botao-excluir-conta");
         if (botaoExcluir) {
             const referenciaPendenciaExcluir = doc(db, "usuarios", uidAtual, "pendencias", botaoExcluir.dataset.id);
@@ -1575,7 +1738,10 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         await updateDoc(referenciaPendencia, { pago: true, lancamentoId: novoLancamento.id, pagoEm: serverTimestamp() });
-    });
+    }
+
+    listaPendencias.addEventListener("click", handlerCliqueListaPendencias);
+    listaCartao.addEventListener("click", handlerCliqueListaPendencias);
 
     // ==========================================================================
     // COMPARAÇÃO COM O MÊS ANTERIOR
