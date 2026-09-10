@@ -36,8 +36,8 @@ document.addEventListener("DOMContentLoaded", function () {
     // ruim, Firebase fora do ar, etc.), o TEMPO_MAXIMO_SEGURANCA garante que
     // ela some sozinha de qualquer jeito — nunca mais fica travada pra sempre.
     // ==========================================================================
-    const TEMPO_MINIMO_VISIVEL = 800;   // pra dar tempo da animação aparecer bonita
-    const TEMPO_MAXIMO_SEGURANCA = 4000; // rede de segurança: nunca passa disso
+    const TEMPO_MINIMO_VISIVEL = 6500;  // a tela de carregamento fica visível por esse tempo, de propósito
+    const TEMPO_MAXIMO_SEGURANCA = 8000; // rede de segurança: nunca passa disso, mesmo com internet ruim
     const inicioCarregamento = Date.now();
     let splashJaEscondida = false;
 

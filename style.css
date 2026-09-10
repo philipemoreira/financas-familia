@@ -86,54 +86,70 @@ body#pagina-login {
     text-transform: uppercase;
     color: var(--accent);
     opacity: 0;
-    animation: aparecer-selo-carregamento 0.5s ease forwards;
+    animation: aparecer-selo-carregamento 0.6s ease 0.1s forwards;
 }
 
 .grafico-carregamento {
-    width: 230px;
+    width: 260px;
     height: auto;
 }
 
-#linha-carregamento {
-    stroke-dasharray: 320;
-    animation: ciclo-linha-carregamento 2.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+/* A área (gradiente sob a linha) só aparece depois que a linha já começou
+   a se desenhar, dando profundidade sem competir com o traço */
+#area-carregamento {
+    opacity: 0;
+    animation: aparecer-area-carregamento 2s ease 1.2s forwards;
 }
 
+/* A linha se desenha UMA VEZ SÓ, devagar — não é mais um loop repetitivo,
+   é uma sequência única que acompanha os 6-7 segundos da tela toda */
+#linha-carregamento {
+    stroke-dasharray: 420;
+    stroke-dashoffset: 420;
+    animation: desenhar-linha-carregamento 4s cubic-bezier(0.65, 0, 0.35, 1) 0.9s forwards;
+}
+
+/* O pontinho só aparece quando a linha termina de desenhar, com uma
+   entrada em "pulo" — depois disso, fica respirando suavemente, dando
+   sensação de assentado e vivo, não de "ainda carregando" */
 .ponto-carregamento {
-    animation: ciclo-ponto-carregamento 2.2s ease infinite;
+    opacity: 0;
+    transform: scale(0.5);
+    animation:
+        aparecer-ponto-carregamento 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 4.9s forwards,
+        respirar-ponto-carregamento 1.8s ease-in-out 5.4s infinite;
 }
 
 @keyframes aparecer-selo-carregamento {
     to { opacity: 1; }
 }
 
-/* A linha desenha, segura um instante completa, some rapidinho e recomeça —
-   dá a sensação de "carregando" sem ficar repetitivo demais */
-@keyframes ciclo-linha-carregamento {
-    0%   { stroke-dashoffset: 320; opacity: 1; }
-    55%  { stroke-dashoffset: 0;   opacity: 1; }
-    75%  { stroke-dashoffset: 0;   opacity: 0; }
-    76%  { stroke-dashoffset: 320; opacity: 0; }
-    100% { stroke-dashoffset: 320; opacity: 1; }
+@keyframes aparecer-area-carregamento {
+    to { opacity: 1; }
 }
 
-/* O pontinho branco no fim da linha só aparece quando ela termina de desenhar,
-   dá uma piscadinha, e some junto com o reinício do ciclo */
-@keyframes ciclo-ponto-carregamento {
-    0%, 50% { opacity: 0; transform: scale(0.6); }
-    60%     { opacity: 1; transform: scale(1.2); }
-    70%     { opacity: 1; transform: scale(1); }
-    75%     { opacity: 0; }
-    100%    { opacity: 0; }
+@keyframes desenhar-linha-carregamento {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes aparecer-ponto-carregamento {
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes respirar-ponto-carregamento {
+    0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); }
+    50%      { opacity: 0.85; transform: scale(1.15); filter: drop-shadow(0 0 6px rgba(217, 119, 87, 0.6)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
     #linha-carregamento,
+    #area-carregamento,
     .ponto-carregamento,
     .selo-marca-carregamento {
         animation: none !important;
         opacity: 1;
         stroke-dashoffset: 0;
+        transform: none;
     }
 }
 
@@ -143,14 +159,15 @@ body#pagina-login {
 .tela-login {
     min-height: 100vh;
     display: grid;
-    grid-template-columns: 1fr 1fr; /* Metade pra marca, metade pro formulário */
+    grid-template-columns: 1.15fr 1fr; /* Marca ganha um pouco mais de espaço, é o "herói" da tela */
+    background: radial-gradient(ellipse 800px 600px at 15% 20%, rgba(217, 119, 87, 0.05), transparent 60%);
 }
 
 /* ==========================================================================
    PAINEL DA MARCA (lado esquerdo)
    ========================================================================== */
 .painel-marca {
-    background: linear-gradient(160deg, #151515 0%, #050505 100%);
+    background: linear-gradient(155deg, #171310 0%, #0d0806 55%, #050302 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -164,8 +181,22 @@ body#pagina-login {
     content: "";
     position: absolute;
     inset: 0;
-    background-image: radial-gradient(circle at 20% 20%, rgba(217, 119, 87, 0.08), transparent 45%),
-                       radial-gradient(circle at 80% 80%, rgba(217, 119, 87, 0.06), transparent 40%);
+    background-image: radial-gradient(circle at 15% 15%, rgba(217, 119, 87, 0.1), transparent 45%),
+                       radial-gradient(circle at 85% 85%, rgba(217, 119, 87, 0.07), transparent 42%);
+    pointer-events: none;
+}
+
+/* Uma segunda camada de luz, bem discreta, atrás do texto — dá profundidade
+   sem competir com o conteúdo */
+.painel-marca::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 480px;
+    height: 480px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(217, 119, 87, 0.06) 0%, transparent 70%);
     pointer-events: none;
 }
 
@@ -183,16 +214,26 @@ body#pagina-login {
     letter-spacing: 1.5px;
     text-transform: uppercase;
     color: var(--accent);
-    margin-bottom: 24px;
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: entrada-marca-login 0.6s ease 0.1s forwards;
 }
 
 .titulo-marca {
     font-family: var(--fonte-titulo);
-    font-size: clamp(32px, 3.2vw, 44px);
+    font-size: clamp(36px, 3.6vw, 52px);
     font-weight: 600;
-    line-height: 1.2;
-    margin: 0 0 20px 0;
+    line-height: 1.15;
+    letter-spacing: -0.5px;
+    margin: 0 0 22px 0;
     color: var(--text-primary);
+    opacity: 0;
+    animation: entrada-marca-login 0.6s ease 0.25s forwards;
+}
+
+@keyframes entrada-marca-login {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .texto-marca {
@@ -200,6 +241,9 @@ body#pagina-login {
     line-height: 1.6;
     color: var(--text-muted);
     margin: 0 0 48px 0;
+    max-width: 90%;
+    opacity: 0;
+    animation: entrada-marca-login 0.6s ease 0.4s forwards;
 }
 
 /* Gráfico assinatura: a linha some e se desenha sozinha ao carregar a página */
@@ -209,23 +253,31 @@ body#pagina-login {
     height: auto;
 }
 
+#area-crescimento {
+    opacity: 0;
+    animation: aparecer-area-marca 1.6s ease 1.3s forwards;
+}
+
 #linha-crescimento {
     stroke-dasharray: 400;
     stroke-dashoffset: 400;
-    animation: desenhar-linha 1.8s cubic-bezier(0.65, 0, 0.35, 1) 0.3s forwards;
+    animation: desenhar-linha 2s cubic-bezier(0.65, 0, 0.35, 1) 0.6s forwards;
 }
 
 .ponto-grafico {
     opacity: 0;
     animation: aparecer-ponto 0.4s ease forwards;
 }
-.ponto-1 { animation-delay: 0.4s; }
-.ponto-2 { animation-delay: 0.9s; }
-.ponto-3 { animation-delay: 1.4s; }
-.ponto-4 { animation-delay: 1.9s; }
+.ponto-1 { animation-delay: 0.7s; }
+.ponto-2 { animation-delay: 1.2s; }
+.ponto-3 { animation-delay: 1.8s; }
+.ponto-4 { animation-delay: 2.5s; }
 
 @keyframes desenhar-linha {
     to { stroke-dashoffset: 0; }
+}
+@keyframes aparecer-area-marca {
+    to { opacity: 1; }
 }
 @keyframes aparecer-ponto {
     to { opacity: 1; }
@@ -244,6 +296,13 @@ body#pagina-login {
 .cartao-formulario {
     width: 100%;
     max-width: 380px;
+    background-color: rgba(255, 255, 255, 0.015);
+    border: 1px solid var(--borda);
+    border-radius: 20px;
+    padding: 36px 32px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+    opacity: 0;
+    animation: entrada-marca-login 0.6s ease 0.3s forwards;
 }
 
 /* Abas Entrar / Criar conta */
@@ -650,14 +709,24 @@ select:focus {
         overflow-y: auto;
         min-height: 0; /* sem isso, um item de grid não consegue encolher/rolar de verdade */
     }
+
+    .cartao-formulario {
+        padding: 24px 20px;
+        border-radius: 16px;
+    }
 }
 
 /* Respeita quem prefere menos animação (acessibilidade) */
 @media (prefers-reduced-motion: reduce) {
     #linha-crescimento,
-    .ponto-grafico {
+    #area-crescimento,
+    .ponto-grafico,
+    .selo-marca,
+    .titulo-marca,
+    .texto-marca {
         animation: none !important;
         stroke-dashoffset: 0;
         opacity: 1;
+        transform: none;
     }
 }

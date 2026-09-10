@@ -1,21 +1,24 @@
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-    collection, addDoc, updateDoc, setDoc, deleteDoc, doc, getDoc, getDocs,
+    collection, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs,
     query, where, onSnapshot, Timestamp, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", function () {
 
-    const campoNomeCartao = document.getElementById("campo-nome-cartao");
-    const campoVencimentoFatura = document.getElementById("campo-vencimento-fatura");
-    const botaoSalvarConfigCartao = document.getElementById("botao-salvar-config-cartao");
+    const listaFaturasCartoes = document.getElementById("lista-faturas-cartoes");
+    const cartoesVazio = document.getElementById("cartoes-vazio");
+    const botaoAbrirNovoCartao = document.getElementById("botao-abrir-novo-cartao");
 
-    const totalFaturaEl = document.getElementById("total-fatura");
-    const textoVencimentoFatura = document.getElementById("texto-vencimento-fatura");
-    const botaoMarcarFaturaPaga = document.getElementById("botao-marcar-fatura-paga");
-    const textoFaturaPaga = document.getElementById("texto-fatura-paga");
-    const botaoDesmarcarFatura = document.getElementById("botao-desmarcar-fatura");
+    const fundoModalCartao = document.getElementById("fundo-modal-cartao");
+    const tituloModalCartao = document.getElementById("titulo-modal-cartao");
+    const botaoFecharCartao = document.getElementById("botao-fechar-cartao");
+    const campoNomeCartao = document.getElementById("campo-nome-cartao");
+    const campoVencimentoCartao = document.getElementById("campo-vencimento-cartao");
+    const mensagemAvisoCartao = document.getElementById("mensagem-aviso-cartao");
+    const botaoSalvarCartao = document.getElementById("botao-salvar-cartao");
+    const botaoRemoverCartao = document.getElementById("botao-remover-cartao");
 
     const listaItensCartao = document.getElementById("lista-itens-cartao");
     const itensCartaoVazio = document.getElementById("itens-cartao-vazio");
@@ -23,6 +26,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const fundoModalItemCartao = document.getElementById("fundo-modal-item-cartao");
     const botaoFecharItemCartao = document.getElementById("botao-fechar-item-cartao");
+    const campoCartaoDoItem = document.getElementById("campo-cartao-do-item");
     const campoNomeItemCartao = document.getElementById("campo-nome-item-cartao");
     const tipoItemFixo = document.getElementById("tipo-item-fixo");
     const tipoItemParcelado = document.getElementById("tipo-item-parcelado");
@@ -45,9 +49,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const toastBotaoAcao = document.getElementById("toast-botao-acao");
 
     let uidAtual = null;
-    let nomeCartao = "";
-    let diaVencimentoFatura = null;
-    let itensDaFatura = [];
+    let listaDeCartoes = []; // [{id, nome, diaVencimento}]
+    let itensDeTodasAsFaturas = [];
+    let cartaoEmEdicaoId = null;
 
     // ==========================================================================
     // TELINHA DE CONFIRMAÇÃO — substitui o confirm() feio do navegador
@@ -105,64 +109,140 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         uidAtual = usuario.uid;
 
-        const perfilSnapshot = await getDoc(doc(db, "usuarios", uidAtual));
-        const dadosPerfil = perfilSnapshot.exists() ? perfilSnapshot.data() : {};
-        nomeCartao = dadosPerfil.nomeCartao || "";
-        diaVencimentoFatura = dadosPerfil.diaVencimentoFatura || null;
+        escutarCartoes();
+        escutarItensDeTodasAsFaturas();
 
-        campoNomeCartao.value = nomeCartao;
-        campoVencimentoFatura.value = diaVencimentoFatura || "";
-
-        escutarItensDoCartao();
-
-        // Se a pessoa veio direto do botão "Cartão" no +, já abre o
-        // formulário de adicionar item na hora, sem precisar clicar de novo
         const parametros = new URLSearchParams(window.location.search);
         if (parametros.get("adicionar") === "1") {
-            abrirModalNovoItem();
+            // Espera os cartões carregarem antes de abrir o formulário, senão
+            // o select "Em qual cartão" abriria vazio
+            const aguardar = setInterval(() => {
+                if (listaDeCartoes.length > 0) {
+                    clearInterval(aguardar);
+                    abrirModalNovoItem();
+                }
+            }, 150);
+            setTimeout(() => clearInterval(aguardar), 3000);
         }
     });
 
-    botaoSalvarConfigCartao.addEventListener("click", async () => {
-        nomeCartao = campoNomeCartao.value.trim();
-        const novoVencimento = parseInt(campoVencimentoFatura.value, 10) || null;
-        diaVencimentoFatura = novoVencimento;
+    // ==========================================================================
+    // CARTÕES — criar, editar, remover
+    // ==========================================================================
+    function escutarCartoes() {
+        const referencia = collection(db, "usuarios", uidAtual, "cartoes");
+        onSnapshot(referencia, (snapshot) => {
+            listaDeCartoes = snapshot.docs.map((documento) => ({ id: documento.id, ...documento.data() }));
+            renderizarFaturas();
+            popularSelectCartoes();
+        });
+    }
 
-        await setDoc(doc(db, "usuarios", uidAtual), { nomeCartao, diaVencimentoFatura }, { merge: true });
-        renderizarFatura();
-        mostrarToast("Configuração salva ✓");
+    function popularSelectCartoes() {
+        const valorAtual = campoCartaoDoItem.value;
+        campoCartaoDoItem.innerHTML = "";
+        listaDeCartoes.forEach((cartao) => {
+            const opcao = document.createElement("option");
+            opcao.value = cartao.id;
+            opcao.textContent = cartao.nome;
+            campoCartaoDoItem.appendChild(opcao);
+        });
+        if (valorAtual) campoCartaoDoItem.value = valorAtual;
+    }
+
+    function abrirModalCartao(cartao) {
+        cartaoEmEdicaoId = cartao ? cartao.id : null;
+        tituloModalCartao.textContent = cartao ? "Editar cartão" : "Novo cartão";
+        campoNomeCartao.value = cartao ? cartao.nome : "";
+        campoVencimentoCartao.value = cartao ? (cartao.diaVencimento || "") : "";
+        botaoRemoverCartao.hidden = !cartao;
+        mensagemAvisoCartao.classList.remove("visivel");
+        fundoModalCartao.classList.add("aberto");
+    }
+
+    botaoAbrirNovoCartao.addEventListener("click", () => abrirModalCartao(null));
+    botaoFecharCartao.addEventListener("click", () => fundoModalCartao.classList.remove("aberto"));
+    fundoModalCartao.addEventListener("click", (evento) => {
+        if (evento.target === fundoModalCartao) fundoModalCartao.classList.remove("aberto");
+    });
+
+    botaoSalvarCartao.addEventListener("click", async () => {
+        const nome = campoNomeCartao.value.trim();
+        const diaVencimento = parseInt(campoVencimentoCartao.value, 10) || null;
+        mensagemAvisoCartao.classList.remove("visivel");
+
+        if (!nome) {
+            mensagemAvisoCartao.textContent = "Digita um nome pro cartão.";
+            mensagemAvisoCartao.classList.add("visivel");
+            return;
+        }
+
+        const spinner = botaoSalvarCartao.querySelector(".spinner-botao");
+        botaoSalvarCartao.disabled = true;
+        spinner.hidden = false;
+
+        if (cartaoEmEdicaoId) {
+            await updateDoc(doc(db, "usuarios", uidAtual, "cartoes", cartaoEmEdicaoId), { nome, diaVencimento });
+        } else {
+            await addDoc(collection(db, "usuarios", uidAtual, "cartoes"), { nome, diaVencimento });
+        }
+
+        botaoSalvarCartao.disabled = false;
+        spinner.hidden = true;
+        fundoModalCartao.classList.remove("aberto");
+        mostrarToast("Cartão salvo ✓");
+    });
+
+    botaoRemoverCartao.addEventListener("click", async () => {
+        if (!cartaoEmEdicaoId) return;
+        const confirmou = await confirmarComTelinha(
+            "Tem certeza de que deseja remover esse cartão? Os itens que já entraram em faturas continuam salvos no histórico.",
+            "Remover cartão"
+        );
+        if (!confirmou) return;
+
+        await deleteDoc(doc(db, "usuarios", uidAtual, "cartoes", cartaoEmEdicaoId));
+        fundoModalCartao.classList.remove("aberto");
+        mostrarToast("Cartão removido");
     });
 
     // ==========================================================================
-    // ITENS DO CARTÃO — sempre o mês real de hoje (essa tela não navega por mês)
+    // ITENS DE TODAS AS FATURAS — sempre o mês real de hoje (essa tela não
+    // navega por mês, é sempre "o que está pra vencer agora")
     // ==========================================================================
-    function escutarItensDoCartao() {
+    function escutarItensDeTodasAsFaturas() {
         const mesAtual = mesReferenciaString(new Date());
         const referencia = collection(db, "usuarios", uidAtual, "pendencias");
         const consulta = query(referencia, where("mesReferencia", "==", mesAtual), where("noCartao", "==", true));
 
         onSnapshot(consulta, (snapshot) => {
-            itensDaFatura = snapshot.docs;
+            itensDeTodasAsFaturas = snapshot.docs;
             renderizarItensCartao();
-            renderizarFatura();
+            renderizarFaturas();
         });
+    }
+
+    function nomeDoCartao(cartaoId) {
+        const cartao = listaDeCartoes.find((c) => c.id === cartaoId);
+        return cartao ? cartao.nome : "Cartão removido";
     }
 
     function renderizarItensCartao() {
         listaItensCartao.innerHTML = "";
-        itensCartaoVazio.hidden = itensDaFatura.length > 0;
+        itensCartaoVazio.hidden = itensDeTodasAsFaturas.length > 0;
 
-        itensDaFatura.forEach((documento) => {
+        itensDeTodasAsFaturas.forEach((documento) => {
             const dados = documento.data();
             const badge = dados.origem === "parcelado"
                 ? `<span class="badge-parcela">Parcela ${dados.numeroParcela}/${dados.totalParcelas}</span>`
                 : `<span class="badge-parcela">Fixo</span>`;
+            const badgeCartaoHtml = `<span class="badge-cartao">${nomeDoCartao(dados.cartaoId)}</span>`;
 
             const item = document.createElement("li");
             item.className = "item-conta";
             item.innerHTML = `
                 <div class="info-conta">
-                    <div class="nome-conta">${dados.descricao}${badge}</div>
+                    <div class="nome-conta">${dados.descricao}${badge}${badgeCartaoHtml}</div>
                     <div class="meta-conta">${dados.pago ? "Já entrou nessa fatura" : "Entra na próxima fatura"}</div>
                 </div>
                 <span class="valor-conta" style="color: ${dados.pago ? "var(--sucesso)" : "#F5D76E"};">${formatarMoeda(dados.valor)}</span>
@@ -215,92 +295,121 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // ==========================================================================
-    // FATURA DO MÊS
+    // FATURAS — uma por cartão cadastrado
     // ==========================================================================
-    function renderizarFatura() {
-        const itensNaoPagos = itensDaFatura.filter((documento) => !documento.data().pago);
-        const faturaEstaPaga = itensDaFatura.length > 0 && itensNaoPagos.length === 0;
+    function renderizarFaturas() {
+        listaFaturasCartoes.innerHTML = "";
+        cartoesVazio.hidden = listaDeCartoes.length > 0;
 
-        const itensRelevantes = faturaEstaPaga ? itensDaFatura : itensNaoPagos;
-        const totalFatura = itensRelevantes.reduce((soma, documento) => soma + documento.data().valor, 0);
+        listaDeCartoes.forEach((cartao) => {
+            const itensDoCartao = itensDeTodasAsFaturas.filter((documento) => documento.data().cartaoId === cartao.id);
+            const itensNaoPagos = itensDoCartao.filter((documento) => !documento.data().pago);
+            const faturaEstaPaga = itensDoCartao.length > 0 && itensNaoPagos.length === 0;
+            const itensRelevantes = faturaEstaPaga ? itensDoCartao : itensNaoPagos;
+            const totalFatura = itensRelevantes.reduce((soma, documento) => soma + documento.data().valor, 0);
 
-        totalFaturaEl.textContent = formatarMoeda(totalFatura);
-        botaoMarcarFaturaPaga.hidden = faturaEstaPaga || itensDaFatura.length === 0;
-        textoFaturaPaga.hidden = !faturaEstaPaga;
+            const textoVencimento = cartao.diaVencimento ? `Vence todo dia ${cartao.diaVencimento}` : "Sem dia de vencimento definido";
 
-        if (diaVencimentoFatura) {
-            textoVencimentoFatura.hidden = false;
-            textoVencimentoFatura.textContent = `Vence todo dia ${diaVencimentoFatura}`;
-        } else {
-            textoVencimentoFatura.hidden = true;
-        }
+            const botaoAcaoHtml = faturaEstaPaga
+                ? `<button type="button" class="link-botao-simples" data-acao="desmarcar" data-cartao="${cartao.id}">✓ Paga — desmarcar</button>`
+                : (itensDoCartao.length > 0
+                    ? `<button type="button" class="botao-retirar" data-acao="marcar" data-cartao="${cartao.id}">Marcar como paga</button>`
+                    : "");
+
+            const item = document.createElement("div");
+            item.className = "fatura-cartao-item";
+            item.innerHTML = `
+                <div class="fatura-cartao-cabecalho">
+                    <span class="fatura-cartao-nome">${cartao.nome}</span>
+                    <button type="button" class="link-botao-simples" data-acao="editar" data-cartao="${cartao.id}">Editar</button>
+                </div>
+                <span class="fatura-cartao-valor">${formatarMoeda(totalFatura)}</span>
+                <span class="fatura-cartao-vencimento">${textoVencimento}</span>
+                ${botaoAcaoHtml}
+            `;
+            listaFaturasCartoes.appendChild(item);
+        });
     }
 
-    botaoMarcarFaturaPaga.addEventListener("click", async () => {
-        const itensNaoPagos = itensDaFatura.filter((documento) => !documento.data().pago);
-        const totalFatura = itensNaoPagos.reduce((soma, documento) => soma + documento.data().valor, 0);
-        if (itensNaoPagos.length === 0) return;
+    listaFaturasCartoes.addEventListener("click", async (evento) => {
+        const botao = evento.target.closest("[data-acao]");
+        if (!botao) return;
 
-        const confirmou = await confirmarComTelinha(
-            `Confirma o pagamento da fatura inteira, no valor de ${formatarMoeda(totalFatura)}? Isso desconta o valor total do seu saldo, uma vez só.`,
-            "Pagar fatura do cartão"
-        );
-        if (!confirmou) return;
+        const cartaoId = botao.dataset.cartao;
+        const acao = botao.dataset.acao;
 
-        const agora = new Date();
-        const novoLancamento = await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
-            tipo: "gasto",
-            valor: totalFatura,
-            categoria: "Fatura do Cartão",
-            descricao: nomeCartao ? `Fatura do Cartão — ${nomeCartao}` : "Fatura do Cartão de Crédito",
-            data: Timestamp.fromDate(agora),
-            mesReferencia: mesReferenciaString(agora),
-            criadoEm: serverTimestamp()
-        });
-
-        const lote = writeBatch(db);
-        itensNaoPagos.forEach((documento) => {
-            lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
-                pago: true,
-                lancamentoId: novoLancamento.id,
-                pagoEm: serverTimestamp()
-            });
-        });
-        await lote.commit();
-        mostrarToast("Fatura paga ✓");
-    });
-
-    botaoDesmarcarFatura.addEventListener("click", async () => {
-        const itensPagos = itensDaFatura.filter((documento) => documento.data().pago);
-        if (itensPagos.length === 0) return;
-
-        const confirmou = await confirmarComTelinha(
-            "Tem certeza de que deseja desmarcar o pagamento dessa fatura? O valor volta pro seu saldo.",
-            "Desmarcar fatura"
-        );
-        if (!confirmou) return;
-
-        const idsLancamentosUnicos = [...new Set(itensPagos.map((documento) => documento.data().lancamentoId).filter(Boolean))];
-        for (const idLancamento of idsLancamentosUnicos) {
-            await deleteDoc(doc(db, "usuarios", uidAtual, "lancamentos", idLancamento)).catch(() => {});
+        if (acao === "editar") {
+            const cartao = listaDeCartoes.find((c) => c.id === cartaoId);
+            abrirModalCartao(cartao);
+            return;
         }
 
-        const lote = writeBatch(db);
-        itensPagos.forEach((documento) => {
-            lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
-                pago: false,
-                lancamentoId: null,
-                pagoEm: null
+        const itensDoCartao = itensDeTodasAsFaturas.filter((documento) => documento.data().cartaoId === cartaoId);
+
+        if (acao === "marcar") {
+            const itensNaoPagos = itensDoCartao.filter((documento) => !documento.data().pago);
+            const totalFatura = itensNaoPagos.reduce((soma, documento) => soma + documento.data().valor, 0);
+            if (itensNaoPagos.length === 0) return;
+
+            const confirmou = await confirmarComTelinha(
+                `Confirma o pagamento da fatura do ${nomeDoCartao(cartaoId)}, no valor de ${formatarMoeda(totalFatura)}? Isso desconta o valor total do seu saldo, uma vez só.`,
+                "Pagar fatura"
+            );
+            if (!confirmou) return;
+
+            const agora = new Date();
+            const novoLancamento = await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
+                tipo: "gasto",
+                valor: totalFatura,
+                categoria: "Fatura do Cartão",
+                descricao: `Fatura — ${nomeDoCartao(cartaoId)}`,
+                data: Timestamp.fromDate(agora),
+                mesReferencia: mesReferenciaString(agora),
+                criadoEm: serverTimestamp()
             });
-        });
-        await lote.commit();
-        mostrarToast("Fatura desmarcada");
+
+            const lote = writeBatch(db);
+            itensNaoPagos.forEach((documento) => {
+                lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
+                    pago: true,
+                    lancamentoId: novoLancamento.id,
+                    pagoEm: serverTimestamp()
+                });
+            });
+            await lote.commit();
+            mostrarToast("Fatura paga ✓");
+        }
+
+        if (acao === "desmarcar") {
+            const itensPagos = itensDoCartao.filter((documento) => documento.data().pago);
+            if (itensPagos.length === 0) return;
+
+            const confirmou = await confirmarComTelinha(
+                "Tem certeza de que deseja desmarcar o pagamento dessa fatura? O valor volta pro seu saldo.",
+                "Desmarcar fatura"
+            );
+            if (!confirmou) return;
+
+            const idsLancamentosUnicos = [...new Set(itensPagos.map((documento) => documento.data().lancamentoId).filter(Boolean))];
+            for (const idLancamento of idsLancamentosUnicos) {
+                await deleteDoc(doc(db, "usuarios", uidAtual, "lancamentos", idLancamento)).catch(() => {});
+            }
+
+            const lote = writeBatch(db);
+            itensPagos.forEach((documento) => {
+                lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
+                    pago: false,
+                    lancamentoId: null,
+                    pagoEm: null
+                });
+            });
+            await lote.commit();
+            mostrarToast("Fatura desmarcada");
+        }
     });
 
     // ==========================================================================
-    // ADICIONAR ITEM NO CARTÃO — formulário rápido: nome, tipo, valor, parcelas
-    // (o vencimento não é mais perguntado aqui — só a Fatura tem um vencimento
-    // de verdade, configurado lá em cima)
+    // ADICIONAR ITEM NUMA FATURA
     // ==========================================================================
     function atualizarTipoItem() {
         const ehParcelado = tipoItemParcelado.checked;
@@ -313,10 +422,15 @@ document.addEventListener("DOMContentLoaded", function () {
     tipoItemParcelado.addEventListener("change", atualizarTipoItem);
 
     function abrirModalNovoItem() {
+        if (listaDeCartoes.length === 0) {
+            mostrarToast("Cria um cartão primeiro, aí sim dá pra adicionar itens.");
+            return;
+        }
         campoNomeItemCartao.value = "";
         campoValorItemCartao.value = "";
         campoParcelasItemCartao.value = "";
         tipoItemFixo.checked = true;
+        popularSelectCartoes();
         atualizarTipoItem();
         mensagemAvisoItemCartao.classList.remove("visivel");
         fundoModalItemCartao.classList.add("aberto");
@@ -331,6 +445,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     botaoSalvarItemCartao.addEventListener("click", async () => {
+        const cartaoId = campoCartaoDoItem.value;
         const nome = campoNomeItemCartao.value.trim();
         const valor = paraNumero(campoValorItemCartao.value);
         const ehParcelado = tipoItemParcelado.checked;
@@ -338,6 +453,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
         mensagemAvisoItemCartao.classList.remove("visivel");
 
+        if (!cartaoId) {
+            mensagemAvisoItemCartao.textContent = "Escolhe em qual cartão esse item entra.";
+            mensagemAvisoItemCartao.classList.add("visivel");
+            return;
+        }
         if (!nome) {
             mensagemAvisoItemCartao.textContent = "Digita um nome pro item.";
             mensagemAvisoItemCartao.classList.add("visivel");
@@ -359,10 +479,8 @@ document.addEventListener("DOMContentLoaded", function () {
         spinner.hidden = false;
 
         const hoje = new Date();
-        // O "dia" guardado em cada pendência é só o vencimento da fatura (se
-        // já estiver configurado) — é ele que realmente importa; o item em
-        // si só entra na fatura daquele mês, não tem vencimento próprio
-        const diaParaRegistro = diaVencimentoFatura || 1;
+        const cartaoEscolhido = listaDeCartoes.find((c) => c.id === cartaoId);
+        const diaParaRegistro = (cartaoEscolhido && cartaoEscolhido.diaVencimento) || 1;
 
         if (ehParcelado) {
             const valorParcela = Math.floor((valor / numeroParcelas) * 100) / 100;
@@ -390,6 +508,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     totalParcelas: numeroParcelas,
                     grupoId,
                     noCartao: true,
+                    cartaoId,
                     pago: false,
                     criadoEm: serverTimestamp()
                 });
@@ -412,6 +531,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     origem: "fixo",
                     grupoId,
                     noCartao: true,
+                    cartaoId,
                     pago: false,
                     criadoEm: serverTimestamp()
                 });

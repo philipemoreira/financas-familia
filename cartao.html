@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Cartão de Crédito — Finanças</title>
+    <title>Cartões de Crédito — Finanças</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,53 +25,65 @@
     <div class="app-shell">
         <header class="topo-app">
             <a href="dashboard.html" class="link-voltar" aria-label="Voltar">←</a>
-            <div class="marca-topo">Cartão de Crédito</div>
+            <div class="marca-topo">Cartões de Crédito</div>
             <span style="width:24px"></span>
         </header>
 
         <main class="conteudo-principal">
 
-            <!-- Nome do cartão e vencimento da fatura — direto aqui, sem
-                 precisar de modal separado -->
-            <div class="linha-config-cartao">
-                <div class="campo-nome-cartao-inline">
-                    <label for="campo-nome-cartao">Nome do cartão</label>
-                    <input type="text" id="campo-nome-cartao" placeholder="Ex: Nubank, Inter...">
-                </div>
-                <div class="campo-nome-cartao-inline">
-                    <label for="campo-vencimento-fatura">Vence todo dia</label>
-                    <input type="number" id="campo-vencimento-fatura" min="1" max="31" placeholder="Ex: 10">
-                </div>
+            <div class="cabecalho-lista-lembretes" style="margin-bottom: 14px;">
+                <h3 class="titulo-secao" style="margin:0;">Suas faturas</h3>
+                <button type="button" class="botao-selecionar-lembretes" id="botao-abrir-novo-cartao">+ Novo cartão</button>
             </div>
-            <button type="button" class="botao-salvar-inline botao-salvar-inline-largo" id="botao-salvar-config-cartao">Salvar</button>
 
-            <section class="cartao-saldo-principal" style="margin-top: 22px;">
-                <span class="rotulo-cartao">Fatura deste mês</span>
-                <span class="valor-saldo-grande" id="total-fatura">R$ 0,00</span>
-                <span class="texto-vencimento-fatura" id="texto-vencimento-fatura" hidden></span>
-                <button type="button" class="botao-retirar" id="botao-marcar-fatura-paga">Marcar como paga</button>
-            </section>
+            <div id="lista-faturas-cartoes"></div>
+            <p class="lista-vazia" id="cartoes-vazio" hidden>Nenhum cartão cadastrado ainda. Toca em "+ Novo cartão" pra começar.</p>
 
-            <p class="texto-explicativo-guardado" id="texto-fatura-paga" hidden>
-                ✓ Fatura já paga esse mês. <button type="button" class="link-botao-simples" id="botao-desmarcar-fatura">Desmarcar</button>
-            </p>
-
-            <div class="cabecalho-lista-lembretes" style="margin: 26px 0 14px 0;">
-                <h3 class="titulo-secao" style="margin:0;">Itens da fatura</h3>
+            <div class="cabecalho-lista-lembretes" style="margin: 28px 0 14px 0;">
+                <h3 class="titulo-secao" style="margin:0;">Itens das faturas</h3>
                 <button type="button" class="botao-selecionar-lembretes" id="botao-abrir-novo-item">+ Adicionar item</button>
             </div>
 
             <ul class="lista-contas" id="lista-itens-cartao"></ul>
-            <p class="lista-vazia" id="itens-cartao-vazio" hidden>Nenhum item cadastrado ainda. Toca em "+ Adicionar item" pra começar.</p>
+            <p class="lista-vazia" id="itens-cartao-vazio" hidden>Nenhum item cadastrado ainda.</p>
         </main>
     </div>
 
-    <!-- MODAL: adicionar item no cartão -->
+    <!-- MODAL: criar/editar/remover cartão -->
+    <div class="fundo-modal" id="fundo-modal-cartao">
+        <div class="modal-lancamento">
+            <div class="cabecalho-modal">
+                <h3 id="titulo-modal-cartao">Novo cartão</h3>
+                <button class="botao-fechar-modal" id="botao-fechar-cartao" aria-label="Fechar">✕</button>
+            </div>
+            <div class="campo">
+                <label for="campo-nome-cartao">Nome do cartão</label>
+                <input type="text" id="campo-nome-cartao" placeholder="Ex: Nubank, Inter, Itaú...">
+            </div>
+            <div class="campo">
+                <label for="campo-vencimento-cartao">Vence todo dia</label>
+                <input type="number" id="campo-vencimento-cartao" min="1" max="31" placeholder="Ex: 10">
+            </div>
+            <div class="mensagem-aviso" id="mensagem-aviso-cartao" role="alert"></div>
+            <button type="button" class="botao-enviar" id="botao-salvar-cartao">
+                <span class="texto-botao">Salvar</span>
+                <span class="spinner-botao" hidden></span>
+            </button>
+            <button type="button" class="link-botao-simples" id="botao-remover-cartao" style="display:block; margin: 14px auto 0; color: var(--error);" hidden>Remover cartão</button>
+        </div>
+    </div>
+
+    <!-- MODAL: adicionar item numa fatura -->
     <div class="fundo-modal" id="fundo-modal-item-cartao">
         <div class="modal-lancamento">
             <div class="cabecalho-modal">
-                <h3>Novo item no cartão</h3>
+                <h3>Novo item na fatura</h3>
                 <button class="botao-fechar-modal" id="botao-fechar-item-cartao" aria-label="Fechar">✕</button>
+            </div>
+
+            <div class="campo">
+                <label for="campo-cartao-do-item">Em qual cartão</label>
+                <select id="campo-cartao-do-item"></select>
             </div>
 
             <div class="campo">

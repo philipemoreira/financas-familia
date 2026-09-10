@@ -193,8 +193,6 @@ document.addEventListener("DOMContentLoaded", function () {
     let pararDeEscutar = null;
     let pararDeEscutarSalario = null;
     let salarioPadrao = 0;
-    let nomeCartao = "";
-    let diaVencimentoFatura = null;
     let mapaOrcamentos = {}; // {categoria: limite}
     let primeiroNome = "";
     let idEmEdicao = null; // null = criando novo | string = editando esse lançamento
@@ -222,8 +220,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const perfil = perfilSnapshot.data();
         primeiroNome = (perfil.nome || "").trim().split(" ")[0] || "";
         salarioPadrao = perfil.salarioPadrao || 0;
-        nomeCartao = perfil.nomeCartao || "";
-        diaVencimentoFatura = perfil.diaVencimentoFatura || null;
 
         // Pro perfil Diarista, o botão do meio continua mostrando "Ganho";
         // pra todo mundo, mostra "Extra"
@@ -1496,9 +1492,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const itensRelevantes = faturaEstaPaga ? pendenciasNoCartao : itensNaoPagos;
         const totalFatura = itensRelevantes.reduce((soma, documento) => soma + documento.data().valor, 0);
 
-        tituloFaturaCartao.textContent = nomeCartao ? `Fatura — ${nomeCartao}` : "Fatura do mês";
+        // Combina o total de TODOS os cartões cadastrados — o detalhe de cada
+        // um (nome, vencimento, fatura própria) fica na tela do Cartão
+        tituloFaturaCartao.textContent = "Cartões de Crédito";
         valorFaturaCartao.textContent = formatarMoeda(totalFatura);
-        vencimentoFaturaCartao.textContent = diaVencimentoFatura ? `Vence dia ${diaVencimentoFatura}` : "";
+        vencimentoFaturaCartao.textContent = "Ver detalhes por cartão";
     }
 
     // ==========================================================================

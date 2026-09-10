@@ -1198,3 +1198,52 @@ body {
 .texto-vencimento-fatura[hidden] {
     display: none;
 }
+
+.fatura-cartao-item {
+    background: linear-gradient(160deg, var(--surface) 0%, #1c1410 100%);
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 12px;
+}
+
+.fatura-cartao-cabecalho {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.fatura-cartao-nome {
+    font-family: var(--fonte-titulo);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.fatura-cartao-valor {
+    font-family: var(--fonte-titulo);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 2px;
+}
+
+.fatura-cartao-vencimento {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    display: block;
+}
+
+.badge-cartao {
+    display: inline-block;
+    background-color: rgba(167, 139, 250, 0.15);
+    color: #A78BFA;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+}
