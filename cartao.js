@@ -16,6 +16,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const botaoFecharBancoReal = document.getElementById("botao-fechar-banco-real");
     const campoNomeBancoReal = document.getElementById("campo-nome-banco-real");
     const campoSaldoInicialBanco = document.getElementById("campo-saldo-inicial-banco");
+    const textoSaldoAtualBanco = document.getElementById("texto-saldo-atual-banco");
+    const campoCorrigirSaldoWrapper = document.getElementById("campo-corrigir-saldo-wrapper");
+    const campoCorrigirSaldoBanco = document.getElementById("campo-corrigir-saldo-banco");
     const campoBancoPrincipal = document.getElementById("campo-banco-principal");
     const mensagemAvisoBancoReal = document.getElementById("mensagem-aviso-banco-real");
     const botaoSalvarBancoReal = document.getElementById("botao-salvar-banco-real");
@@ -30,6 +33,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const botaoFecharCartao = document.getElementById("botao-fechar-cartao");
     const campoNomeCartao = document.getElementById("campo-nome-cartao");
     const campoVencimentoCartao = document.getElementById("campo-vencimento-cartao");
+    const campoLimiteCartao = document.getElementById("campo-limite-cartao");
     const mensagemAvisoCartao = document.getElementById("mensagem-aviso-cartao");
     const botaoSalvarCartao = document.getElementById("botao-salvar-cartao");
     const botaoRemoverCartao = document.getElementById("botao-remover-cartao");
@@ -38,6 +42,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const itensCartaoVazio = document.getElementById("itens-cartao-vazio");
     const listaItensProximoMes = document.getElementById("lista-itens-proximo-mes");
     const itensProximoMesVazio = document.getElementById("itens-proximo-mes-vazio");
+    const cabecalhoItensAtrasados = document.getElementById("cabecalho-itens-atrasados");
+    const listaItensAtrasados = document.getElementById("lista-itens-atrasados");
+
+    const fundoModalPagarFatura = document.getElementById("fundo-modal-pagar-fatura");
+    const botaoFecharPagarFatura = document.getElementById("botao-fechar-pagar-fatura");
+    const textoPagarFaturaValor = document.getElementById("texto-pagar-fatura-valor");
+    const campoBancoPagarFatura = document.getElementById("campo-banco-pagar-fatura");
+    const mensagemAvisoPagarFatura = document.getElementById("mensagem-aviso-pagar-fatura");
+    const botaoConfirmarPagarFatura = document.getElementById("botao-confirmar-pagar-fatura");
 
     const fundoModalConfirmar = document.getElementById("fundo-modal-confirmar");
     const tituloModalConfirmar = document.getElementById("titulo-modal-confirmar");
@@ -54,9 +67,11 @@ document.addEventListener("DOMContentLoaded", function () {
     let listaDeCartoes = []; // [{id, nome, diaVencimento}]
     let listaDeBancosReais = []; // [{id, nome, saldoInicial, principal}]
     let todosOsLancamentos = []; // usado pra calcular o saldo real de cada banco
-    let itensDeTodasAsFaturas = [];
-    let itensDoProximoMes = [];
+    let itensDeTodasAsFaturas = []; // itens da fatura "de agora" (mesReferencia === mês atual)
+    let itensDoProximoMes = []; // itens de QUALQUER mês futuro (não só o seguinte)
+    let itensAtrasados = []; // itens de QUALQUER mês passado, ainda não pagos
     let cartaoEmEdicaoId = null;
+    let pagamentoFaturaPendente = null; // { itensNaoPagos, totalFatura, cartaoId, textoFatura }
     let bancoRealEmEdicaoId = null;
 
     // ==========================================================================
@@ -116,8 +131,7 @@ document.addEventListener("DOMContentLoaded", function () {
         uidAtual = usuario.uid;
 
         escutarCartoes();
-        escutarItensDeTodasAsFaturas();
-        escutarItensDoProximoMes();
+        escutarTodosOsItensDoCartao();
         escutarBancosReais();
         escutarTodosOsLancamentos();
     });
@@ -138,6 +152,7 @@ document.addEventListener("DOMContentLoaded", function () {
         tituloModalCartao.textContent = cartao ? "Editar cartão" : "Novo cartão";
         campoNomeCartao.value = cartao ? cartao.nome : "";
         campoVencimentoCartao.value = cartao ? (cartao.diaVencimento || "") : "";
+        campoLimiteCartao.value = cartao && cartao.limite ? String(cartao.limite).replace(".", ",") : "";
         botaoRemoverCartao.hidden = !cartao;
         mensagemAvisoCartao.classList.remove("visivel");
         fundoModalCartao.classList.add("aberto");
@@ -152,6 +167,7 @@ document.addEventListener("DOMContentLoaded", function () {
     botaoSalvarCartao.addEventListener("click", async () => {
         const nome = campoNomeCartao.value.trim();
         const diaVencimento = parseInt(campoVencimentoCartao.value, 10) || null;
+        const limite = paraNumero(campoLimiteCartao.value) || null;
         mensagemAvisoCartao.classList.remove("visivel");
 
         if (!nome) {
@@ -165,9 +181,9 @@ document.addEventListener("DOMContentLoaded", function () {
         spinner.hidden = false;
 
         if (cartaoEmEdicaoId) {
-            await updateDoc(doc(db, "usuarios", uidAtual, "cartoes", cartaoEmEdicaoId), { nome, diaVencimento });
+            await updateDoc(doc(db, "usuarios", uidAtual, "cartoes", cartaoEmEdicaoId), { nome, diaVencimento, limite });
         } else {
-            await addDoc(collection(db, "usuarios", uidAtual, "cartoes"), { nome, diaVencimento });
+            await addDoc(collection(db, "usuarios", uidAtual, "cartoes"), { nome, diaVencimento, limite });
         }
 
         botaoSalvarCartao.disabled = false;
@@ -190,32 +206,28 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // ==========================================================================
-    // ITENS DE TODAS AS FATURAS — mês real de hoje é "o que está pra vencer
-    // agora"; mês seguinte é "o que acabou de entrar, ainda não fechou" —
-    // toda compra nova no crédito sempre nasce nessa segunda lista, então
-    // sem ela a pessoa não teria como ver/apagar o que acabou de lançar
+    // ITENS DE TODAS AS FATURAS — busca TODOS os itens no cartão, de
+    // qualquer mês (não trava mais em "só 2 meses fixos"), e separa em 3
+    // grupos: atrasados (mês já passou, ainda não pago), agora (mês real
+    // de hoje), e futuros (qualquer mês adiante, não só o seguinte) —
+    // assim uma fatura esquecida nunca mais "some" da tela sozinha
     // ==========================================================================
-    function escutarItensDeTodasAsFaturas() {
-        const mesAtual = mesReferenciaString(new Date());
+    function escutarTodosOsItensDoCartao() {
         const referencia = collection(db, "usuarios", uidAtual, "pendencias");
-        const consulta = query(referencia, where("mesReferencia", "==", mesAtual), where("noCartao", "==", true));
+        const consulta = query(referencia, where("noCartao", "==", true));
 
         onSnapshot(consulta, (snapshot) => {
-            itensDeTodasAsFaturas = snapshot.docs;
+            const mesAtual = mesReferenciaString(new Date());
+
+            itensAtrasados = snapshot.docs.filter((documento) => documento.data().mesReferencia < mesAtual && !documento.data().pago);
+            itensDeTodasAsFaturas = snapshot.docs.filter((documento) => documento.data().mesReferencia === mesAtual);
+            itensDoProximoMes = snapshot.docs.filter((documento) => documento.data().mesReferencia > mesAtual);
+
+            cabecalhoItensAtrasados.hidden = itensAtrasados.length === 0;
+            renderizarListaDeItens(itensAtrasados, listaItensAtrasados, null);
             renderizarListaDeItens(itensDeTodasAsFaturas, listaItensCartao, itensCartaoVazio);
-            renderizarFaturas();
-        });
-    }
-
-    function escutarItensDoProximoMes() {
-        const hoje = new Date();
-        const proximoMes = mesReferenciaString(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1));
-        const referencia = collection(db, "usuarios", uidAtual, "pendencias");
-        const consulta = query(referencia, where("mesReferencia", "==", proximoMes), where("noCartao", "==", true));
-
-        onSnapshot(consulta, (snapshot) => {
-            itensDoProximoMes = snapshot.docs;
             renderizarListaDeItens(itensDoProximoMes, listaItensProximoMes, itensProximoMesVazio);
+            renderizarFaturas();
         });
     }
 
@@ -226,9 +238,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Desenha uma lista de itens de fatura — usada tanto pro mês atual
     // quanto pro mês seguinte, pra não duplicar o mesmo HTML duas vezes
+    const NOMES_MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+    function formatarMesReferencia(mesReferencia) {
+        const [ano, mes] = mesReferencia.split("-");
+        return `${NOMES_MESES[parseInt(mes, 10) - 1]}/${ano}`;
+    }
+
     function renderizarListaDeItens(itens, listaAlvo, elementoVazio) {
         listaAlvo.innerHTML = "";
-        elementoVazio.hidden = itens.length > 0;
+        if (elementoVazio) elementoVazio.hidden = itens.length > 0;
 
         itens.forEach((documento) => {
             const dados = documento.data();
@@ -242,7 +260,7 @@ document.addEventListener("DOMContentLoaded", function () {
             item.innerHTML = `
                 <div class="info-conta">
                     <div class="nome-conta">${dados.descricao}${badge}${badgeCartaoHtml}</div>
-                    <div class="meta-conta">${dados.pago ? "Já entrou nessa fatura" : "Entra na próxima fatura"}</div>
+                    <div class="meta-conta">${dados.pago ? "Já paga" : `Fatura de ${formatarMesReferencia(dados.mesReferencia)}`}</div>
                 </div>
                 <span class="valor-conta" style="color: ${dados.pago ? "var(--sucesso)" : "#F5D76E"};">${formatarMoeda(dados.valor)}</span>
                 <button class="botao-excluir-conta" data-id="${documento.id}" aria-label="Excluir item">
@@ -297,28 +315,155 @@ document.addEventListener("DOMContentLoaded", function () {
 
     listaItensCartao.addEventListener("click", handlerCliqueListaItens);
     listaItensProximoMes.addEventListener("click", handlerCliqueListaItens);
+    listaItensAtrasados.addEventListener("click", handlerCliqueListaItens);
 
     // ==========================================================================
     // FATURAS — uma por cartão cadastrado
     // ==========================================================================
+    function abrirModalPagarFatura(itensNaoPagos, totalFatura, cartaoId, textoFatura) {
+        pagamentoFaturaPendente = { itensNaoPagos, totalFatura, cartaoId, textoFatura };
+        textoPagarFaturaValor.textContent = `Pagamento ${textoFatura} do ${nomeDoCartao(cartaoId)}, no valor de ${formatarMoeda(totalFatura)}.`;
+
+        campoBancoPagarFatura.innerHTML = "";
+        if (listaDeBancosReais.length === 0) {
+            const opcaoVazia = document.createElement("option");
+            opcaoVazia.value = "";
+            opcaoVazia.disabled = true;
+            opcaoVazia.selected = true;
+            opcaoVazia.textContent = "Cria um banco primeiro, ali em cima";
+            campoBancoPagarFatura.appendChild(opcaoVazia);
+        } else {
+            const opcaoPlaceholder = document.createElement("option");
+            opcaoPlaceholder.value = "";
+            opcaoPlaceholder.disabled = true;
+            opcaoPlaceholder.selected = true;
+            opcaoPlaceholder.textContent = "Selecione...";
+            campoBancoPagarFatura.appendChild(opcaoPlaceholder);
+
+            listaDeBancosReais.forEach((banco) => {
+                const opcao = document.createElement("option");
+                opcao.value = banco.nome;
+                opcao.textContent = banco.nome;
+                campoBancoPagarFatura.appendChild(opcao);
+            });
+        }
+
+        mensagemAvisoPagarFatura.classList.remove("visivel");
+        fundoModalPagarFatura.classList.add("aberto");
+    }
+
+    botaoFecharPagarFatura.addEventListener("click", () => {
+        fundoModalPagarFatura.classList.remove("aberto");
+    });
+    fundoModalPagarFatura.addEventListener("click", (evento) => {
+        if (evento.target === fundoModalPagarFatura) fundoModalPagarFatura.classList.remove("aberto");
+    });
+
+    botaoConfirmarPagarFatura.addEventListener("click", async () => {
+        const bancoEscolhido = campoBancoPagarFatura.value;
+        mensagemAvisoPagarFatura.classList.remove("visivel");
+
+        if (!bancoEscolhido) {
+            mensagemAvisoPagarFatura.textContent = "Escolhe de qual banco sai o pagamento.";
+            mensagemAvisoPagarFatura.classList.add("visivel");
+            return;
+        }
+
+        const { itensNaoPagos, totalFatura, cartaoId } = pagamentoFaturaPendente;
+        const spinner = botaoConfirmarPagarFatura.querySelector(".spinner-botao");
+        botaoConfirmarPagarFatura.disabled = true;
+        spinner.hidden = false;
+
+        const agora = new Date();
+        const novoLancamento = await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
+            tipo: "gasto",
+            valor: totalFatura,
+            categoria: "Fatura do Cartão",
+            descricao: `Fatura — ${nomeDoCartao(cartaoId)}`,
+            banco: bancoEscolhido,
+            data: Timestamp.fromDate(agora),
+            mesReferencia: mesReferenciaString(agora),
+            criadoEm: serverTimestamp()
+        });
+
+        const lote = writeBatch(db);
+        itensNaoPagos.forEach((documento) => {
+            lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
+                pago: true,
+                lancamentoId: novoLancamento.id,
+                pagoEm: serverTimestamp()
+            });
+        });
+        await lote.commit();
+
+        botaoConfirmarPagarFatura.disabled = false;
+        spinner.hidden = true;
+        fundoModalPagarFatura.classList.remove("aberto");
+        mostrarToast("Fatura paga ✓");
+    });
+
     function renderizarFaturas() {
         listaFaturasCartoes.innerHTML = "";
         cartoesVazio.hidden = listaDeCartoes.length > 0;
 
         listaDeCartoes.forEach((cartao) => {
-            const itensDoCartao = itensDeTodasAsFaturas.filter((documento) => documento.data().cartaoId === cartao.id);
-            const itensNaoPagos = itensDoCartao.filter((documento) => !documento.data().pago);
-            const faturaEstaPaga = itensDoCartao.length > 0 && itensNaoPagos.length === 0;
-            const itensRelevantes = faturaEstaPaga ? itensDoCartao : itensNaoPagos;
-            const totalFatura = itensRelevantes.reduce((soma, documento) => soma + documento.data().valor, 0);
+            // ATRASADAS — qualquer mês que já passou e ainda não foi pago.
+            // Tudo junto (não separado por mês), com um botão só de pagar
+            // tudo de uma vez — o jeito mais simples de "quitar" o atraso.
+            const itensAtrasadosDoCartao = itensAtrasados.filter((documento) => documento.data().cartaoId === cartao.id);
+            const totalAtrasado = itensAtrasadosDoCartao.reduce((soma, documento) => soma + documento.data().valor, 0);
+
+            // Fatura de AGORA — o que já fechou, pronto pra pagar
+            const itensDoCartaoAgora = itensDeTodasAsFaturas.filter((documento) => documento.data().cartaoId === cartao.id);
+            const itensNaoPagosAgora = itensDoCartaoAgora.filter((documento) => !documento.data().pago);
+            const faturaAgoraEstaPaga = itensDoCartaoAgora.length > 0 && itensNaoPagosAgora.length === 0;
+            const totalAgora = (faturaAgoraEstaPaga ? itensDoCartaoAgora : itensNaoPagosAgora)
+                .reduce((soma, documento) => soma + documento.data().valor, 0);
+
+            // Fatura do PRÓXIMO MÊS — ainda não fechou, mas já dá pra ver
+            // (e, se quiser, pagar adiantado)
+            const itensDoCartaoProximo = itensDoProximoMes.filter((documento) => documento.data().cartaoId === cartao.id);
+            const itensNaoPagosProximo = itensDoCartaoProximo.filter((documento) => !documento.data().pago);
+            const faturaProximaEstaPaga = itensDoCartaoProximo.length > 0 && itensNaoPagosProximo.length === 0;
+            const totalProximo = (faturaProximaEstaPaga ? itensDoCartaoProximo : itensNaoPagosProximo)
+                .reduce((soma, documento) => soma + documento.data().valor, 0);
 
             const textoVencimento = cartao.diaVencimento ? `Vence todo dia ${cartao.diaVencimento}` : "Sem dia de vencimento definido";
 
-            const botaoAcaoHtml = faturaEstaPaga
-                ? `<button type="button" class="link-botao-simples" data-acao="desmarcar" data-cartao="${cartao.id}">✓ Paga — desmarcar</button>`
-                : (itensDoCartao.length > 0
-                    ? `<button type="button" class="botao-retirar" data-acao="marcar" data-cartao="${cartao.id}">Marcar como paga</button>`
+            // Limite disponível — desconta TUDO que ainda não foi pago,
+            // atrasado + agora + o que ainda vai fechar, porque tudo isso
+            // junto representa o quanto do limite já está comprometido
+            let textoLimiteHtml = "";
+            if (cartao.limite) {
+                const usado = totalAtrasado
+                    + itensNaoPagosAgora.reduce((s, d) => s + d.data().valor, 0)
+                    + itensNaoPagosProximo.reduce((s, d) => s + d.data().valor, 0);
+                const disponivel = cartao.limite - usado;
+                textoLimiteHtml = `<span class="fatura-cartao-vencimento" style="display:block; margin-top:2px;">Limite disponível: ${formatarMoeda(disponivel)} de ${formatarMoeda(cartao.limite)}</span>`;
+            }
+
+            const blocoAtrasadoHtml = itensAtrasadosDoCartao.length > 0 ? `
+                <div style="margin-top: 14px; padding: 10px; background: rgba(229, 72, 77, 0.1); border-radius: 8px;">
+                    <span class="fatura-cartao-vencimento" style="display:block; margin-bottom:4px; color: var(--gasto-cor);">🔴 Atrasado — ${itensAtrasadosDoCartao.length} ${itensAtrasadosDoCartao.length === 1 ? "item" : "itens"}</span>
+                    <span class="fatura-cartao-valor" style="font-size: 18px; color: var(--gasto-cor);">${formatarMoeda(totalAtrasado)}</span>
+                    <button type="button" class="botao-retirar" style="border-color: var(--gasto-cor); color: var(--gasto-cor);" data-acao="marcar" data-mes="atrasado" data-cartao="${cartao.id}">Pagar atrasado</button>
+                </div>
+            ` : "";
+
+            const botaoAgoraHtml = faturaAgoraEstaPaga
+                ? `<button type="button" class="link-botao-simples" data-acao="desmarcar" data-mes="agora" data-cartao="${cartao.id}">✓ Paga — desmarcar</button>`
+                : (itensDoCartaoAgora.length > 0
+                    ? `<button type="button" class="botao-retirar" data-acao="marcar" data-mes="agora" data-cartao="${cartao.id}">Marcar como paga</button>`
                     : "");
+
+            // A fatura do próximo mês só ganha ação (marcar/desmarcar) se
+            // tiver algo nela — a maioria das vezes é só informativa mesmo,
+            // já que normalmente você paga só quando ela "fecha" de verdade
+            const botaoProximoHtml = itensDoCartaoProximo.length > 0
+                ? (faturaProximaEstaPaga
+                    ? `<button type="button" class="link-botao-simples" data-acao="desmarcar" data-mes="proximo" data-cartao="${cartao.id}">✓ Paga — desmarcar</button>`
+                    : `<button type="button" class="link-botao-simples" data-acao="marcar" data-mes="proximo" data-cartao="${cartao.id}">Pagar adiantado</button>`)
+                : "";
 
             const item = document.createElement("div");
             item.className = "fatura-cartao-item";
@@ -327,9 +472,17 @@ document.addEventListener("DOMContentLoaded", function () {
                     <span class="fatura-cartao-nome">${cartao.nome}</span>
                     <button type="button" class="link-botao-simples" data-acao="editar" data-cartao="${cartao.id}">Editar</button>
                 </div>
-                <span class="fatura-cartao-valor">${formatarMoeda(totalFatura)}</span>
+                <span class="fatura-cartao-valor">${formatarMoeda(totalAgora)}</span>
                 <span class="fatura-cartao-vencimento">${textoVencimento}</span>
-                ${botaoAcaoHtml}
+                ${textoLimiteHtml}
+                ${blocoAtrasadoHtml}
+                ${botaoAgoraHtml}
+
+                <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--borda);">
+                    <span class="fatura-cartao-vencimento" style="display:block; margin-bottom: 4px;">Próxima fatura (ainda não fechou)</span>
+                    <span class="fatura-cartao-valor" style="font-size: 18px;">${formatarMoeda(totalProximo)}</span>
+                    ${botaoProximoHtml}
+                </div>
             `;
             listaFaturasCartoes.appendChild(item);
         });
@@ -348,40 +501,24 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        const itensDoCartao = itensDeTodasAsFaturas.filter((documento) => documento.data().cartaoId === cartaoId);
+        let listaBase = itensDeTodasAsFaturas;
+        let textoFatura = "da fatura";
+        if (botao.dataset.mes === "proximo") {
+            listaBase = itensDoProximoMes;
+            textoFatura = "da próxima fatura (adiantado)";
+        } else if (botao.dataset.mes === "atrasado") {
+            listaBase = itensAtrasados;
+            textoFatura = "atrasado";
+        }
+        const itensDoCartao = listaBase.filter((documento) => documento.data().cartaoId === cartaoId);
 
         if (acao === "marcar") {
             const itensNaoPagos = itensDoCartao.filter((documento) => !documento.data().pago);
             const totalFatura = itensNaoPagos.reduce((soma, documento) => soma + documento.data().valor, 0);
             if (itensNaoPagos.length === 0) return;
 
-            const confirmou = await confirmarComTelinha(
-                `Confirma o pagamento da fatura do ${nomeDoCartao(cartaoId)}, no valor de ${formatarMoeda(totalFatura)}? Isso desconta o valor total do seu saldo, uma vez só.`,
-                "Pagar fatura"
-            );
-            if (!confirmou) return;
-
-            const agora = new Date();
-            const novoLancamento = await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
-                tipo: "gasto",
-                valor: totalFatura,
-                categoria: "Fatura do Cartão",
-                descricao: `Fatura — ${nomeDoCartao(cartaoId)}`,
-                data: Timestamp.fromDate(agora),
-                mesReferencia: mesReferenciaString(agora),
-                criadoEm: serverTimestamp()
-            });
-
-            const lote = writeBatch(db);
-            itensNaoPagos.forEach((documento) => {
-                lote.update(doc(db, "usuarios", uidAtual, "pendencias", documento.id), {
-                    pago: true,
-                    lancamentoId: novoLancamento.id,
-                    pagoEm: serverTimestamp()
-                });
-            });
-            await lote.commit();
-            mostrarToast("Fatura paga ✓");
+            abrirModalPagarFatura(itensNaoPagos, totalFatura, cartaoId, textoFatura);
+            return;
         }
 
         if (acao === "desmarcar") {
@@ -453,6 +590,12 @@ document.addEventListener("DOMContentLoaded", function () {
             if (dados.tipo === "gasto" && !ehCategoriaEspecial && (dados.formaPagamento === "pix" || dados.formaPagamento === "debito") && dados.banco === nomeBanco) {
                 total -= dados.valor;
             }
+            // Pagamento de fatura do cartão — não é PIX nem Débito
+            // (é um tipo de pagamento próprio), mas também sai de um banco
+            // de verdade, então desconta igual
+            if (dados.categoria === "Fatura do Cartão" && dados.banco === nomeBanco) {
+                total -= dados.valor;
+            }
 
             // Guardar/Retirar viram TRANSFERÊNCIA entre bancos. O campo
             // "banco" de cada lançamento já carrega o sinal certo através
@@ -508,8 +651,22 @@ document.addEventListener("DOMContentLoaded", function () {
         campoNomeBancoReal.value = banco ? banco.nome : "";
         campoSaldoInicialBanco.value = banco && banco.saldoInicial ? String(banco.saldoInicial).replace(".", ",") : "";
         campoBancoPrincipal.checked = banco ? !!banco.principal : false;
+        campoCorrigirSaldoBanco.value = "";
         botaoRemoverBancoReal.hidden = !banco;
         mensagemAvisoBancoReal.classList.remove("visivel");
+
+        // O ajuste rápido só faz sentido editando um banco que já existe —
+        // pra um banco novo, "saldo inicial" já é o próprio ponto de partida
+        if (banco) {
+            const saldoAtual = calcularSaldoBanco(banco.nome, banco.saldoInicial);
+            textoSaldoAtualBanco.textContent = `Saldo atual calculado: ${formatarMoeda(saldoAtual)}`;
+            textoSaldoAtualBanco.hidden = false;
+            campoCorrigirSaldoWrapper.hidden = false;
+        } else {
+            textoSaldoAtualBanco.hidden = true;
+            campoCorrigirSaldoWrapper.hidden = true;
+        }
+
         fundoModalBancoReal.classList.add("aberto");
     }
 
@@ -519,9 +676,43 @@ document.addEventListener("DOMContentLoaded", function () {
         if (evento.target === fundoModalBancoReal) fundoModalBancoReal.classList.remove("aberto");
     });
 
+    // Se o nome do banco mudar, todo o histórico antigo (que guarda o
+    // NOME, não um ID) precisa ser atualizado também — senão o cálculo do
+    // saldo "esquece" tudo que aconteceu antes da renomeação, silenciosamente
+    async function propagarRenomeacaoBanco(nomeAntigo, nomeNovo) {
+        if (nomeAntigo === nomeNovo) return;
+
+        const referenciaLancamentos = collection(db, "usuarios", uidAtual, "lancamentos");
+
+        // Onde esse banco era o "banco" (destino de ganho/guardar, ou de
+        // onde saiu um gasto em débito/PIX)
+        const consultaBanco = query(referenciaLancamentos, where("banco", "==", nomeAntigo));
+        const resultadoBanco = await getDocs(consultaBanco);
+        for (let i = 0; i < resultadoBanco.docs.length; i += 450) {
+            const pedaco = resultadoBanco.docs.slice(i, i + 450);
+            const lote = writeBatch(db);
+            pedaco.forEach((documento) => {
+                lote.update(documento.ref, { banco: nomeNovo });
+            });
+            await lote.commit();
+        }
+
+        // Onde esse banco era a ORIGEM de uma transferência do Guardar
+        const consultaOrigem = query(referenciaLancamentos, where("bancoOrigem", "==", nomeAntigo));
+        const resultadoOrigem = await getDocs(consultaOrigem);
+        for (let i = 0; i < resultadoOrigem.docs.length; i += 450) {
+            const pedaco = resultadoOrigem.docs.slice(i, i + 450);
+            const lote = writeBatch(db);
+            pedaco.forEach((documento) => {
+                lote.update(documento.ref, { bancoOrigem: nomeNovo });
+            });
+            await lote.commit();
+        }
+    }
+
     botaoSalvarBancoReal.addEventListener("click", async () => {
         const nome = campoNomeBancoReal.value.trim();
-        const saldoInicial = paraNumero(campoSaldoInicialBanco.value) || 0;
+        let saldoInicial = paraNumero(campoSaldoInicialBanco.value) || 0;
         const principal = campoBancoPrincipal.checked;
         mensagemAvisoBancoReal.classList.remove("visivel");
 
@@ -531,9 +722,28 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
+        // Se preencheu "Corrigir saldo atual pra", calcula sozinho o novo
+        // saldo inicial necessário pra chegar nesse valor — sem a pessoa
+        // ter que fazer a conta de cabeça
+        const bancoAtual = bancoRealEmEdicaoId ? listaDeBancosReais.find((b) => b.id === bancoRealEmEdicaoId) : null;
+        if (bancoAtual && campoCorrigirSaldoBanco.value.trim()) {
+            const valorCorrigido = paraNumero(campoCorrigirSaldoBanco.value);
+            const saldoAtualCalculado = calcularSaldoBanco(bancoAtual.nome, bancoAtual.saldoInicial || 0);
+            const diferenca = saldoAtualCalculado - (bancoAtual.saldoInicial || 0); // soma de tudo que já entrou/saiu
+            saldoInicial = valorCorrigido - diferenca;
+        }
+
         const spinner = botaoSalvarBancoReal.querySelector(".spinner-botao");
         botaoSalvarBancoReal.disabled = true;
         spinner.hidden = false;
+
+        // Propaga a renomeação ANTES de salvar o banco em si — assim, se
+        // algo falhar no meio do caminho, tentar salvar de novo não vai
+        // duplicar nem confundir nada (itens já migrados simplesmente não
+        // aparecem de novo na busca por "nome antigo")
+        if (bancoAtual && bancoAtual.nome !== nome) {
+            await propagarRenomeacaoBanco(bancoAtual.nome, nome);
+        }
 
         // Só um banco pode ser "principal" por vez — desmarca qualquer
         // outro que já estivesse marcado antes de salvar esse

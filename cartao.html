@@ -54,6 +54,12 @@
             <div id="lista-faturas-cartoes"></div>
             <p class="lista-vazia" id="cartoes-vazio" hidden>Nenhum cartão cadastrado ainda. Toca em "+ Novo cartão" pra começar.</p>
 
+            <div class="cabecalho-lista-lembretes" style="margin: 28px 0 14px 0;" id="cabecalho-itens-atrasados" hidden>
+                <h3 class="titulo-secao" style="margin:0; color: var(--gasto-cor);">🔴 Atrasadas</h3>
+            </div>
+
+            <ul class="lista-contas" id="lista-itens-atrasados"></ul>
+
             <div class="cabecalho-lista-lembretes" style="margin: 28px 0 14px 0;">
                 <h3 class="titulo-secao" style="margin:0;">Itens da fatura de agora</h3>
             </div>
@@ -62,11 +68,11 @@
             <p class="lista-vazia" id="itens-cartao-vazio" hidden>Nada por aqui agora — compras no crédito só entram na fatura do mês seguinte, veja a seção abaixo.</p>
 
             <div class="cabecalho-lista-lembretes" style="margin: 28px 0 14px 0;">
-                <h3 class="titulo-secao" style="margin:0;">Itens da próxima fatura <span class="dica-campo">(ainda não fechou)</span></h3>
+                <h3 class="titulo-secao" style="margin:0;">Itens das próximas faturas <span class="dica-campo">(ainda não fecharam)</span></h3>
             </div>
 
             <ul class="lista-contas" id="lista-itens-proximo-mes"></ul>
-            <p class="lista-vazia" id="itens-proximo-mes-vazio" hidden>Nenhum item pra próxima fatura ainda — toda compra nova no crédito aparece aqui primeiro.</p>
+            <p class="lista-vazia" id="itens-proximo-mes-vazio" hidden>Nenhum item pras próximas faturas ainda — toda compra nova no crédito aparece aqui primeiro.</p>
         </main>
     </div>
 
@@ -82,11 +88,20 @@
                 <input type="text" id="campo-nome-banco-real" placeholder="Ex: Sicredi, Nubank, Inter...">
             </div>
             <div class="campo">
-                <label for="campo-saldo-inicial-banco">Saldo inicial <span class="dica-campo">(quanto já tem lá hoje)</span></label>
+                <label for="campo-saldo-inicial-banco">Saldo inicial <span class="dica-campo">(quanto já tinha lá quando criou)</span></label>
                 <div class="valor-wrapper">
                     <span class="prefixo-valor">R$</span>
                     <input type="text" inputmode="decimal" id="campo-saldo-inicial-banco" placeholder="0,00">
                 </div>
+            </div>
+            <p class="texto-explicativo-guardado" id="texto-saldo-atual-banco" hidden style="margin-bottom: 14px;"></p>
+            <div class="campo" id="campo-corrigir-saldo-wrapper" hidden>
+                <label for="campo-corrigir-saldo-banco">Corrigir saldo atual pra <span class="dica-campo">(opcional — só se o número tiver errado)</span></label>
+                <div class="valor-wrapper">
+                    <span class="prefixo-valor">R$</span>
+                    <input type="text" inputmode="decimal" id="campo-corrigir-saldo-banco" placeholder="Deixa em branco se estiver certo">
+                </div>
+                <p class="dica-campo" style="margin-top: 6px;">Preenchendo isso, o app calcula sozinho o ajuste — não precisa saber a diferença de cabeça.</p>
             </div>
             <label class="item-checkbox" style="margin-bottom: 18px;">
                 <input type="checkbox" id="campo-banco-principal">
@@ -116,12 +131,38 @@
                 <label for="campo-vencimento-cartao">Vence todo dia</label>
                 <input type="number" id="campo-vencimento-cartao" min="1" max="31" placeholder="Ex: 10">
             </div>
+            <div class="campo">
+                <label for="campo-limite-cartao">Limite do cartão <span class="dica-campo">(opcional)</span></label>
+                <div class="valor-wrapper">
+                    <span class="prefixo-valor">R$</span>
+                    <input type="text" inputmode="decimal" id="campo-limite-cartao" placeholder="0,00">
+                </div>
+            </div>
             <div class="mensagem-aviso" id="mensagem-aviso-cartao" role="alert"></div>
             <button type="button" class="botao-enviar" id="botao-salvar-cartao">
                 <span class="texto-botao">Salvar</span>
                 <span class="spinner-botao" hidden></span>
             </button>
             <button type="button" class="link-botao-simples" id="botao-remover-cartao" style="display:block; margin: 14px auto 0; color: var(--error);" hidden>Remover cartão</button>
+        </div>
+    </div>
+
+    <div class="fundo-modal" id="fundo-modal-pagar-fatura">
+        <div class="modal-lancamento">
+            <div class="cabecalho-modal">
+                <h3 id="titulo-modal-pagar-fatura">Pagar fatura</h3>
+                <button class="botao-fechar-modal" id="botao-fechar-pagar-fatura" aria-label="Fechar">✕</button>
+            </div>
+            <p class="texto-explicativo-guardado" id="texto-pagar-fatura-valor"></p>
+            <div class="campo">
+                <label for="campo-banco-pagar-fatura">De qual banco sai o pagamento</label>
+                <select id="campo-banco-pagar-fatura" required></select>
+            </div>
+            <div class="mensagem-aviso" id="mensagem-aviso-pagar-fatura" role="alert"></div>
+            <button type="button" class="botao-enviar" id="botao-confirmar-pagar-fatura">
+                <span class="texto-botao">Confirmar pagamento</span>
+                <span class="spinner-botao" hidden></span>
+            </button>
         </div>
     </div>
 

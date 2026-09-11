@@ -602,6 +602,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (dados.tipo === "gasto" && !ehCategoriaEspecial && (dados.formaPagamento === "pix" || dados.formaPagamento === "debito") && dados.banco === banco.nome) {
                     saldoBanco -= dados.valor;
                 }
+                if (dados.categoria === "Fatura do Cartão" && dados.banco === banco.nome) {
+                    saldoBanco -= dados.valor;
+                }
                 if (ehCategoriaEspecial && dados.banco === banco.nome) {
                     saldoBanco += dados.valor;
                 }
@@ -1408,6 +1411,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
             bancoFinal = campoBanco.value === "__sem_banco__" ? null : campoBanco.value;
             bancoOrigemFinal = campoBancoOrigem.value === "__sem_banco__" ? null : campoBancoOrigem.value;
+
+            // Não faz sentido "transferir" de um banco pra ele mesmo — se a
+            // pessoa quer só separar mentalmente (sem mover de verdade),
+            // isso já é resolvido escolhendo "Sem banco específico" nos
+            // dois, não escolhendo o mesmo banco nomeado nos dois campos
+            if (bancoFinal && bancoOrigemFinal && bancoFinal === bancoOrigemFinal) {
+                mostrarAviso(`"De qual banco" e "Para qual banco" não podem ser o mesmo (${bancoFinal}). Se é pra só separar mentalmente, sem mover de verdade, escolhe "Sem banco específico" nos dois.`);
+                return;
+            }
         } else if (categoriaFinal === "__nova__") {
             const nomeNovaCategoria = campoNovaCategoria.value.trim();
             if (!nomeNovaCategoria) {
@@ -1887,7 +1899,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Combina o total de TODOS os cartões cadastrados — o detalhe de cada
         // um (nome, vencimento, fatura própria) fica na tela do Cartão
-        tituloFaturaCartao.textContent = "Cartões de Crédito";
+        tituloFaturaCartao.textContent = "Fatura Cartões de Crédito";
         valorFaturaCartao.textContent = formatarMoeda(totalFatura);
         vencimentoFaturaCartao.textContent = "Ver detalhes por cartão";
     }
