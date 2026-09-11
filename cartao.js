@@ -36,6 +36,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const listaItensCartao = document.getElementById("lista-itens-cartao");
     const itensCartaoVazio = document.getElementById("itens-cartao-vazio");
+    const listaItensProximoMes = document.getElementById("lista-itens-proximo-mes");
+    const itensProximoMesVazio = document.getElementById("itens-proximo-mes-vazio");
 
     const fundoModalConfirmar = document.getElementById("fundo-modal-confirmar");
     const tituloModalConfirmar = document.getElementById("titulo-modal-confirmar");
@@ -53,6 +55,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let listaDeBancosReais = []; // [{id, nome, saldoInicial, principal}]
     let todosOsLancamentos = []; // usado pra calcular o saldo real de cada banco
     let itensDeTodasAsFaturas = [];
+    let itensDoProximoMes = [];
     let cartaoEmEdicaoId = null;
     let bancoRealEmEdicaoId = null;
 
@@ -114,6 +117,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         escutarCartoes();
         escutarItensDeTodasAsFaturas();
+        escutarItensDoProximoMes();
         escutarBancosReais();
         escutarTodosOsLancamentos();
     });
@@ -186,8 +190,10 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // ==========================================================================
-    // ITENS DE TODAS AS FATURAS — sempre o mês real de hoje (essa tela não
-    // navega por mês, é sempre "o que está pra vencer agora")
+    // ITENS DE TODAS AS FATURAS — mês real de hoje é "o que está pra vencer
+    // agora"; mês seguinte é "o que acabou de entrar, ainda não fechou" —
+    // toda compra nova no crédito sempre nasce nessa segunda lista, então
+    // sem ela a pessoa não teria como ver/apagar o que acabou de lançar
     // ==========================================================================
     function escutarItensDeTodasAsFaturas() {
         const mesAtual = mesReferenciaString(new Date());
@@ -196,8 +202,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
         onSnapshot(consulta, (snapshot) => {
             itensDeTodasAsFaturas = snapshot.docs;
-            renderizarItensCartao();
+            renderizarListaDeItens(itensDeTodasAsFaturas, listaItensCartao, itensCartaoVazio);
             renderizarFaturas();
+        });
+    }
+
+    function escutarItensDoProximoMes() {
+        const hoje = new Date();
+        const proximoMes = mesReferenciaString(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1));
+        const referencia = collection(db, "usuarios", uidAtual, "pendencias");
+        const consulta = query(referencia, where("mesReferencia", "==", proximoMes), where("noCartao", "==", true));
+
+        onSnapshot(consulta, (snapshot) => {
+            itensDoProximoMes = snapshot.docs;
+            renderizarListaDeItens(itensDoProximoMes, listaItensProximoMes, itensProximoMesVazio);
         });
     }
 
@@ -206,11 +224,13 @@ document.addEventListener("DOMContentLoaded", function () {
         return cartao ? cartao.nome : "Cartão removido";
     }
 
-    function renderizarItensCartao() {
-        listaItensCartao.innerHTML = "";
-        itensCartaoVazio.hidden = itensDeTodasAsFaturas.length > 0;
+    // Desenha uma lista de itens de fatura — usada tanto pro mês atual
+    // quanto pro mês seguinte, pra não duplicar o mesmo HTML duas vezes
+    function renderizarListaDeItens(itens, listaAlvo, elementoVazio) {
+        listaAlvo.innerHTML = "";
+        elementoVazio.hidden = itens.length > 0;
 
-        itensDeTodasAsFaturas.forEach((documento) => {
+        itens.forEach((documento) => {
             const dados = documento.data();
             const badge = dados.origem === "parcelado"
                 ? `<span class="badge-parcela">Parcela ${dados.numeroParcela}/${dados.totalParcelas}</span>`
@@ -231,11 +251,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     </svg>
                 </button>
             `;
-            listaItensCartao.appendChild(item);
+            listaAlvo.appendChild(item);
         });
     }
 
-    listaItensCartao.addEventListener("click", async (evento) => {
+    // O mesmo comportamento de excluir vale pras duas listas — por isso o
+    // handler fica numa função nomeada, registrada nas duas
+    async function handlerCliqueListaItens(evento) {
         const botao = evento.target.closest(".botao-excluir-conta");
         if (!botao) return;
 
@@ -271,7 +293,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         mostrarToast("Item excluído ✓");
-    });
+    }
+
+    listaItensCartao.addEventListener("click", handlerCliqueListaItens);
+    listaItensProximoMes.addEventListener("click", handlerCliqueListaItens);
 
     // ==========================================================================
     // FATURAS — uma por cartão cadastrado

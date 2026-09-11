@@ -55,11 +55,18 @@
             <p class="lista-vazia" id="cartoes-vazio" hidden>Nenhum cartão cadastrado ainda. Toca em "+ Novo cartão" pra começar.</p>
 
             <div class="cabecalho-lista-lembretes" style="margin: 28px 0 14px 0;">
-                <h3 class="titulo-secao" style="margin:0;">Itens das faturas</h3>
+                <h3 class="titulo-secao" style="margin:0;">Itens da fatura de agora</h3>
             </div>
 
             <ul class="lista-contas" id="lista-itens-cartao"></ul>
-            <p class="lista-vazia" id="itens-cartao-vazio" hidden>Nenhum item ainda — itens no crédito agora entram pelo botão + na tela inicial, escolhendo "Crédito" como forma de pagamento.</p>
+            <p class="lista-vazia" id="itens-cartao-vazio" hidden>Nada por aqui agora — compras no crédito só entram na fatura do mês seguinte, veja a seção abaixo.</p>
+
+            <div class="cabecalho-lista-lembretes" style="margin: 28px 0 14px 0;">
+                <h3 class="titulo-secao" style="margin:0;">Itens da próxima fatura <span class="dica-campo">(ainda não fechou)</span></h3>
+            </div>
+
+            <ul class="lista-contas" id="lista-itens-proximo-mes"></ul>
+            <p class="lista-vazia" id="itens-proximo-mes-vazio" hidden>Nenhum item pra próxima fatura ainda — toda compra nova no crédito aparece aqui primeiro.</p>
         </main>
     </div>
 
