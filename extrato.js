@@ -161,11 +161,25 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? (dados.meta || "Guardado")
                 : (dados.descricao || dados.categoria);
 
+            // Forma de pagamento e banco — só pros lançamentos normais
+            // (Gasto/Extra), o cofrinho já mostra o banco dele de outro
+            // jeito, não precisa duplicar aqui
+            const nomesFormaPagamento = { dinheiro: "Dinheiro", pix: "PIX", debito: "Débito", credito: "Crédito" };
+            let textoFormaPagamento = "";
+            if (!ehCofrinho) {
+                if (dados.formaPagamento) {
+                    textoFormaPagamento += ` · ${nomesFormaPagamento[dados.formaPagamento] || dados.formaPagamento}`;
+                }
+                if (dados.banco) {
+                    textoFormaPagamento += ` · ${dados.banco}`;
+                }
+            }
+
             item.innerHTML = `
                 <span class="ponto-categoria"></span>
                 <div class="info-lancamento">
                     <div class="descricao-lancamento">${tituloGrande}</div>
-                    <div class="meta-lancamento">${dados.categoria} · ${dataFormatada} às ${horaFormatada}</div>
+                    <div class="meta-lancamento">${dados.categoria} · ${dataFormatada} às ${horaFormatada}${textoFormaPagamento}</div>
                 </div>
                 <span class="valor-lancamento">${sinal} ${formatarMoeda(dados.valor)}</span>
                 <button class="botao-excluir" data-id="${documento.id}" data-categoria="${dados.categoria}" aria-label="Excluir lançamento">

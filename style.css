@@ -106,7 +106,7 @@ body#pagina-login {
     width: 0%;
     background-color: #FFFFFF;
     border-radius: 20px;
-    animation: preencher-barra-carregamento 9s linear forwards;
+    animation: preencher-barra-carregamento 7s linear forwards;
 }
 
 .texto-status-carregamento {

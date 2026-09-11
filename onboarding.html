@@ -17,10 +17,9 @@
     <link rel="icon" href="favicon-16.png" sizes="16x16">
 </head>
 <body>
-    </div>
 
     <div class="tela-onboarding">
-        <div class="cartao-onboarding">
+        <div class="cartao-onboarding" id="etapa-perfil">
             <span class="selo-marca">Bull</span>
             <h1 class="titulo-onboarding">Só mais um passo</h1>
             <p class="texto-onboarding">Conta um pouco sobre você pra gente ajustar o app do seu jeito.</p>
@@ -57,10 +56,28 @@
                 </div>
 
                 <button type="submit" class="botao-enviar" id="botao-enviar">
-                    <span class="texto-botao">Começar a usar</span>
+                    <span class="texto-botao">Continuar</span>
                     <span class="spinner-botao" hidden></span>
                 </button>
             </form>
+        </div>
+
+        <div class="cartao-onboarding" id="etapa-bancos" hidden>
+            <span class="selo-marca">Bull</span>
+            <h1 class="titulo-onboarding">Seus bancos</h1>
+            <p class="texto-onboarding">Cadastra os bancos que você usa, com quanto já tem em cada um hoje — assim os cálculos já começam certos. Pode pular e fazer isso depois, se preferir.</p>
+
+            <div class="mensagem-aviso" id="mensagem-aviso-bancos"></div>
+
+            <div id="lista-bancos-onboarding"></div>
+
+            <button type="button" class="botao-adicionar-banco-onboarding" id="botao-adicionar-banco-onboarding">+ Adicionar outro banco</button>
+
+            <button type="button" class="botao-enviar" id="botao-finalizar-onboarding" style="margin-top: 18px;">
+                <span class="texto-botao">Salvar e começar a usar</span>
+                <span class="spinner-botao" hidden></span>
+            </button>
+            <button type="button" class="link-botao-simples" id="botao-pular-bancos" style="display:block; margin:16px auto 0;">Pular por enquanto</button>
         </div>
     </div>
 

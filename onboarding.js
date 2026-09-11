@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { doc, setDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 document.addEventListener("DOMContentLoaded", function () {
 
@@ -14,7 +14,88 @@ document.addEventListener("DOMContentLoaded", function () {
     const textoBotao = botaoEnviar.querySelector(".texto-botao");
     const spinnerBotao = botaoEnviar.querySelector(".spinner-botao");
 
+    const etapaPerfil = document.getElementById("etapa-perfil");
+    const etapaBancos = document.getElementById("etapa-bancos");
+    const listaBancosOnboarding = document.getElementById("lista-bancos-onboarding");
+    const botaoAdicionarBancoOnboarding = document.getElementById("botao-adicionar-banco-onboarding");
+    const botaoFinalizarOnboarding = document.getElementById("botao-finalizar-onboarding");
+    const botaoPularBancos = document.getElementById("botao-pular-bancos");
+    const mensagemAvisoBancos = document.getElementById("mensagem-aviso-bancos");
+
     let uidAtual = null;
+
+    // Converte texto digitado em número, aceitando vírgula ou ponto
+    function paraNumero(texto) {
+        return parseFloat(String(texto).replace(",", "."));
+    }
+
+    // ==========================================================================
+    // ETAPA 2 — BANCOS (pulável)
+    // ==========================================================================
+    function adicionarLinhaBanco() {
+        const linha = document.createElement("div");
+        linha.className = "linha-banco-onboarding";
+        linha.innerHTML = `
+            <div class="campo">
+                <label>Nome do banco</label>
+                <input type="text" class="input-nome-banco-onboarding" placeholder="Ex: Nubank, Sicredi...">
+            </div>
+            <div class="campo">
+                <label>Saldo inicial</label>
+                <div class="valor-wrapper">
+                    <span class="prefixo-valor">R$</span>
+                    <input type="text" inputmode="decimal" class="input-saldo-banco-onboarding" placeholder="0,00">
+                </div>
+            </div>
+            <button type="button" class="botao-remover-linha-banco" aria-label="Remover">✕</button>
+        `;
+        linha.querySelector(".botao-remover-linha-banco").addEventListener("click", () => {
+            linha.remove();
+        });
+        listaBancosOnboarding.appendChild(linha);
+    }
+
+    botaoAdicionarBancoOnboarding.addEventListener("click", adicionarLinhaBanco);
+
+    async function salvarBancosOnboarding() {
+        const linhas = listaBancosOnboarding.querySelectorAll(".linha-banco-onboarding");
+        const bancosParaSalvar = [];
+
+        linhas.forEach((linha) => {
+            const nome = linha.querySelector(".input-nome-banco-onboarding").value.trim();
+            const saldoTexto = linha.querySelector(".input-saldo-banco-onboarding").value;
+            // Linhas sem nome são simplesmente ignoradas — a pessoa pode ter
+            // clicado "+ Adicionar" e desistido, sem preencher
+            if (nome) {
+                bancosParaSalvar.push({ nome, saldoInicial: paraNumero(saldoTexto) || 0, principal: false });
+            }
+        });
+
+        for (const banco of bancosParaSalvar) {
+            await addDoc(collection(db, "usuarios", uidAtual, "bancos"), banco);
+        }
+    }
+
+    botaoFinalizarOnboarding.addEventListener("click", async () => {
+        mensagemAvisoBancos.classList.remove("visivel");
+        const spinner = botaoFinalizarOnboarding.querySelector(".spinner-botao");
+        botaoFinalizarOnboarding.disabled = true;
+        spinner.hidden = false;
+
+        try {
+            await salvarBancosOnboarding();
+            window.location.href = "dashboard.html";
+        } catch (erro) {
+            mensagemAvisoBancos.textContent = "Não deu pra salvar os bancos agora. Confere sua internet e tenta de novo, ou pula essa parte.";
+            mensagemAvisoBancos.classList.add("visivel");
+            botaoFinalizarOnboarding.disabled = false;
+            spinner.hidden = true;
+        }
+    });
+
+    botaoPularBancos.addEventListener("click", () => {
+        window.location.href = "dashboard.html";
+    });
 
     // Limita a seleção a no máximo 2 profissões marcadas ao mesmo tempo:
     // quando já tem 2 marcadas, desativa as demais até uma ser desmarcada.
@@ -85,7 +166,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 atualizadoEm: serverTimestamp()
             }, { merge: true });
 
-            window.location.href = "dashboard.html";
+            // Perfil salvo — em vez de já ir pro dashboard, mostra a etapa
+            // (pulável) de cadastrar bancos, pra quem quiser já começar
+            // com os saldos certos
+            etapaPerfil.hidden = true;
+            etapaBancos.hidden = false;
+            adicionarLinhaBanco(); // já deixa uma linha pronta pra preencher
 
         } catch (erro) {
             // "permission-denied" aqui normalmente significa que a sessão salva

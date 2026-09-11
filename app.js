@@ -39,8 +39,8 @@ document.addEventListener("DOMContentLoaded", function () {
     // ruim, Firebase fora do ar, etc.), o TEMPO_MAXIMO_SEGURANCA garante que
     // ela some sozinha de qualquer jeito — nunca mais fica travada pra sempre.
     // ==========================================================================
-    const TEMPO_MINIMO_VISIVEL = 9000; // a tela de carregamento fica visível por esse tempo, de propósito
-    const TEMPO_MAXIMO_SEGURANCA = 10500; // rede de segurança: nunca passa disso, mesmo com internet ruim
+    const TEMPO_MINIMO_VISIVEL = 7000; // a tela de carregamento fica visível por esse tempo, de propósito
+    const TEMPO_MAXIMO_SEGURANCA = 8500; // rede de segurança: nunca passa disso, mesmo com internet ruim
     const inicioCarregamento = Date.now();
     let splashJaEscondida = false;
 
@@ -61,8 +61,8 @@ document.addEventListener("DOMContentLoaded", function () {
     // frase parada o tempo todo)
     const textoStatusCarregamento = document.getElementById("texto-status-carregamento");
     if (textoStatusCarregamento) {
-        setTimeout(() => { textoStatusCarregamento.textContent = "Organizando suas finanças"; }, 3000);
-        setTimeout(() => { textoStatusCarregamento.textContent = "Quase lá"; }, 6500);
+        setTimeout(() => { textoStatusCarregamento.textContent = "Organizando suas finanças"; }, 2500);
+        setTimeout(() => { textoStatusCarregamento.textContent = "Quase lá"; }, 5000);
     }
 
     let modoAtual = "entrar";

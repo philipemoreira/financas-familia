@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Cartões de Crédito — Bull</title>
+    <title>Bancos e Cartões — Bull</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,14 +25,29 @@
     <div class="app-shell">
         <header class="topo-app">
             <a href="dashboard.html" class="link-voltar" aria-label="Voltar">←</a>
-            <div class="marca-topo">Cartões de Crédito</div>
+            <div class="marca-topo">Bancos e Cartões</div>
             <span style="width:24px"></span>
         </header>
 
         <main class="conteudo-principal">
 
+            <!-- ========================================================== -->
+            <!-- BANCOS — saldo real de cada banco (ganhos, gastos débito/pix,
+                 transferências do Guardar/Retirar somam e descontam aqui) -->
+            <!-- ========================================================== -->
             <div class="cabecalho-lista-lembretes" style="margin-bottom: 14px;">
-                <h3 class="titulo-secao" style="margin:0;">Suas faturas</h3>
+                <h3 class="titulo-secao" style="margin:0;">Seus bancos</h3>
+                <button type="button" class="botao-selecionar-lembretes" id="botao-abrir-novo-banco-real">+ Novo banco</button>
+            </div>
+
+            <div id="lista-bancos-reais"></div>
+            <p class="lista-vazia" id="bancos-reais-vazio" hidden>Nenhum banco cadastrado ainda. Toca em "+ Novo banco" pra começar.</p>
+
+            <!-- ========================================================== -->
+            <!-- CARTÕES — fatura de cada um, gestão (criar/pagar) -->
+            <!-- ========================================================== -->
+            <div class="cabecalho-lista-lembretes" style="margin: 28px 0 14px 0;">
+                <h3 class="titulo-secao" style="margin:0;">Seus cartões</h3>
                 <button type="button" class="botao-selecionar-lembretes" id="botao-abrir-novo-cartao">+ Novo cartão</button>
             </div>
 
@@ -41,12 +56,42 @@
 
             <div class="cabecalho-lista-lembretes" style="margin: 28px 0 14px 0;">
                 <h3 class="titulo-secao" style="margin:0;">Itens das faturas</h3>
-                <button type="button" class="botao-selecionar-lembretes" id="botao-abrir-novo-item">+ Adicionar item</button>
             </div>
 
             <ul class="lista-contas" id="lista-itens-cartao"></ul>
-            <p class="lista-vazia" id="itens-cartao-vazio" hidden>Nenhum item cadastrado ainda.</p>
+            <p class="lista-vazia" id="itens-cartao-vazio" hidden>Nenhum item ainda — itens no crédito agora entram pelo botão + na tela inicial, escolhendo "Crédito" como forma de pagamento.</p>
         </main>
+    </div>
+
+    <!-- MODAL: criar/editar/remover BANCO (saldo real) -->
+    <div class="fundo-modal" id="fundo-modal-banco-real">
+        <div class="modal-lancamento">
+            <div class="cabecalho-modal">
+                <h3 id="titulo-modal-banco-real">Novo banco</h3>
+                <button class="botao-fechar-modal" id="botao-fechar-banco-real" aria-label="Fechar">✕</button>
+            </div>
+            <div class="campo">
+                <label for="campo-nome-banco-real">Nome do banco</label>
+                <input type="text" id="campo-nome-banco-real" placeholder="Ex: Sicredi, Nubank, Inter...">
+            </div>
+            <div class="campo">
+                <label for="campo-saldo-inicial-banco">Saldo inicial <span class="dica-campo">(quanto já tem lá hoje)</span></label>
+                <div class="valor-wrapper">
+                    <span class="prefixo-valor">R$</span>
+                    <input type="text" inputmode="decimal" id="campo-saldo-inicial-banco" placeholder="0,00">
+                </div>
+            </div>
+            <label class="item-checkbox" style="margin-bottom: 18px;">
+                <input type="checkbox" id="campo-banco-principal">
+                Marcar como banco principal
+            </label>
+            <div class="mensagem-aviso" id="mensagem-aviso-banco-real" role="alert"></div>
+            <button type="button" class="botao-enviar" id="botao-salvar-banco-real">
+                <span class="texto-botao">Salvar</span>
+                <span class="spinner-botao" hidden></span>
+            </button>
+            <button type="button" class="link-botao-simples" id="botao-remover-banco-real" style="display:block; margin: 14px auto 0; color: var(--error);" hidden>Remover banco</button>
+        </div>
     </div>
 
     <!-- MODAL: criar/editar/remover cartão -->
@@ -70,56 +115,6 @@
                 <span class="spinner-botao" hidden></span>
             </button>
             <button type="button" class="link-botao-simples" id="botao-remover-cartao" style="display:block; margin: 14px auto 0; color: var(--error);" hidden>Remover cartão</button>
-        </div>
-    </div>
-
-    <!-- MODAL: adicionar item numa fatura -->
-    <div class="fundo-modal" id="fundo-modal-item-cartao">
-        <div class="modal-lancamento">
-            <div class="cabecalho-modal">
-                <h3>Novo item na fatura</h3>
-                <button class="botao-fechar-modal" id="botao-fechar-item-cartao" aria-label="Fechar">✕</button>
-            </div>
-
-            <div class="campo">
-                <label for="campo-cartao-do-item">Em qual cartão</label>
-                <select id="campo-cartao-do-item"></select>
-            </div>
-
-            <div class="campo">
-                <label for="campo-nome-item-cartao">Nome</label>
-                <input type="text" id="campo-nome-item-cartao" placeholder="Ex: Academia, Netflix, TV nova...">
-            </div>
-
-            <div class="opcoes-especiais-gasto" id="opcoes-tipo-item-cartao">
-                <label class="item-checkbox">
-                    <input type="radio" name="tipo-item-cartao" id="tipo-item-fixo" checked>
-                    Fixo (repete todo mês)
-                </label>
-                <label class="item-checkbox">
-                    <input type="radio" name="tipo-item-cartao" id="tipo-item-parcelado">
-                    Parcelado (tem fim)
-                </label>
-            </div>
-
-            <div class="campo" id="campo-parcelas-item-cartao-wrapper" hidden>
-                <label for="campo-parcelas-item-cartao">Número de parcelas</label>
-                <input type="number" id="campo-parcelas-item-cartao" min="2" max="48" step="1" placeholder="Ex: 10">
-            </div>
-
-            <div class="campo">
-                <label for="campo-valor-item-cartao" id="rotulo-valor-item-cartao">Valor mensal</label>
-                <div class="valor-wrapper">
-                    <span class="prefixo-valor">R$</span>
-                    <input type="text" inputmode="decimal" id="campo-valor-item-cartao" placeholder="0,00">
-                </div>
-            </div>
-
-            <div class="mensagem-aviso" id="mensagem-aviso-item-cartao" role="alert"></div>
-            <button type="button" class="botao-enviar" id="botao-salvar-item-cartao">
-                <span class="texto-botao">Adicionar</span>
-                <span class="spinner-botao" hidden></span>
-            </button>
         </div>
     </div>
 

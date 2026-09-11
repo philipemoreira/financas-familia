@@ -20,7 +20,6 @@
     <link rel="icon" href="favicon-16.png" sizes="16x16">
 </head>
 <body>
-    </div>
 
     <div class="app-shell">
 
@@ -42,7 +41,7 @@
                 <span class="email-usuario" id="email-usuario"></span>
             </div>
             <a href="guardado.html" class="botao-encerrar-sessao">Saldo Guardado</a>
-            <a href="cartao.html" class="botao-encerrar-sessao">Cartões de Crédito</a>
+            <a href="cartao.html" class="botao-encerrar-sessao">Bancos e Cartões</a>
             <a href="anotacoes.html" class="botao-encerrar-sessao">Lembretes de Pagamento</a>
             <a href="extrato.html" class="botao-encerrar-sessao">Ver Extrato Completo</a>
             <a href="configuracoes.html" class="botao-encerrar-sessao">Configurações</a>
@@ -82,6 +81,7 @@
             <section class="cartao-saldo-principal">
                 <span class="rotulo-cartao">Saldo do mês</span>
                 <span class="valor-saldo-grande" id="total-saldo">R$ 0,00</span>
+                <span class="etiqueta-banco-principal" id="etiqueta-banco-principal" hidden></span>
             </section>
 
             <p class="comparacao-mes-anterior" id="comparacao-mes-anterior" hidden></p>
@@ -120,6 +120,7 @@
                 <h3 class="titulo-secao">Pagamentos Pendentes</h3>
                 <ul class="lista-contas" id="lista-pendencias"></ul>
                 <p class="lista-vazia" id="pendencias-vazio" hidden>Nenhum gasto fixo ou parcela pra esse mês.</p>
+                <button type="button" class="botao-ver-mais-pendencias" id="botao-ver-mais-pendencias" hidden></button>
             </section>
 
             <!-- ========================================================== -->
@@ -127,8 +128,17 @@
                  Cartão", com um botão só de marcar paga pra tudo de uma vez -->
             <!-- ========================================================== -->
             <section class="secao-pendencias" id="secao-fatura-cartao" hidden>
-                <h3 class="titulo-secao">Cartões de Crédito</h3>
-                <a href="cartao.html" class="cartao-resumo-link">
+                <h3 class="titulo-secao">Bancos e Cartões</h3>
+
+                <a href="cartao.html" class="cartao-resumo-link" id="link-resumo-bancos" style="margin-bottom: 10px;" hidden>
+                    <div>
+                        <span class="cartao-resumo-titulo">Seus Bancos</span>
+                        <span class="cartao-resumo-valor" id="valor-total-bancos">R$ 0,00</span>
+                    </div>
+                    <span class="cartao-resumo-seta">Ver detalhes →</span>
+                </a>
+
+                <a href="cartao.html" class="cartao-resumo-link" id="link-resumo-fatura">
                     <div>
                         <span class="cartao-resumo-titulo" id="titulo-fatura-cartao">Fatura do Cartão</span>
                         <span class="cartao-resumo-valor" id="valor-fatura-cartao">R$ 0,00</span>
@@ -160,11 +170,10 @@
 
             <div class="etapa-escolha" id="etapa-escolha">
                 <p class="pergunta-escolha" id="pergunta-escolha">Deseja registrar um:</p>
-                <div class="botoes-escolha botoes-escolha-4">
+                <div class="botoes-escolha">
                     <button type="button" class="botao-escolha-tipo escolha-gasto" data-tipo="gasto">Gasto</button>
                     <button type="button" class="botao-escolha-tipo escolha-ganho" id="botao-escolha-extra" data-tipo="extra">Extra</button>
                     <button type="button" class="botao-escolha-tipo escolha-guardar" data-tipo="guardar">Guardar</button>
-                    <button type="button" class="botao-escolha-tipo escolha-cartao" id="botao-escolha-cartao" data-tipo="cartao">Cartão</button>
                 </div>
             </div>
 
@@ -177,6 +186,37 @@
                         <span class="prefixo-valor">R$</span>
                         <input type="text" inputmode="decimal" id="campo-valor" step="0.01" min="0" placeholder="0,00" required>
                     </div>
+                </div>
+
+                <!-- Forma de pagamento — só aparece em Gasto. Define se
+                     desconta o saldo na hora (Dinheiro/PIX/Débito) ou se
+                     entra na fatura do cartão pro mês seguinte (Crédito) -->
+                <div class="campo" id="campo-forma-pagamento-wrapper" hidden>
+                    <label for="campo-forma-pagamento" id="rotulo-forma-pagamento">Forma de pagamento</label>
+                    <select id="campo-forma-pagamento" required>
+                        <option value="" disabled selected>Selecione...</option>
+                        <option value="dinheiro">Dinheiro</option>
+                        <option value="pix">PIX</option>
+                        <option value="debito">Débito</option>
+                        <option value="credito">Crédito</option>
+                    </select>
+                </div>
+
+                <div class="campo" id="campo-banco-pagamento-wrapper" hidden>
+                    <label for="campo-banco-pagamento" id="rotulo-banco-pagamento">De qual banco</label>
+                    <select id="campo-banco-pagamento" required></select>
+                </div>
+
+                <div class="campo" id="campo-chave-pix-wrapper" hidden>
+                    <label for="campo-chave-pix">Chave PIX de quem recebe <span class="dica-campo">(opcional)</span></label>
+                    <input type="text" id="campo-chave-pix" placeholder="E-mail, CPF, telefone ou chave aleatória">
+                    <p class="dica-campo" style="margin-top: 6px;">Salva aqui pra você copiar rápido na hora de pagar, sem precisar ir atrás em outro lugar.</p>
+                </div>
+
+                <div class="campo" id="campo-cartao-pagamento-wrapper" hidden>
+                    <label for="campo-cartao-pagamento">Qual cartão</label>
+                    <select id="campo-cartao-pagamento" required></select>
+                    <p class="dica-campo" style="margin-top: 6px;">Não desconta o saldo agora — entra na fatura do mês que vem, no vencimento que você já cadastrou nesse cartão.</p>
                 </div>
 
                 <div class="campo" id="campo-parcelas-wrapper" hidden>
@@ -212,14 +252,15 @@
                     <input type="number" id="campo-vencimento-nova-categoria" min="1" max="31" placeholder="Ex: 15">
                 </div>
 
-                <div class="campo" id="campo-banco-wrapper" hidden>
-                    <label for="campo-banco">Banco</label>
-                    <select id="campo-banco"></select>
+                <div class="campo" id="campo-banco-origem-wrapper" hidden>
+                    <label for="campo-banco-origem">De qual banco sai</label>
+                    <select id="campo-banco-origem"></select>
                 </div>
 
-                <div class="campo" id="campo-novo-banco-wrapper" hidden>
-                    <label for="campo-novo-banco">Nome do novo banco</label>
-                    <input type="text" id="campo-novo-banco" placeholder="Ex: Nubank, Caixa...">
+                <div class="campo" id="campo-banco-wrapper" hidden>
+                    <label for="campo-banco">Para qual banco vai</label>
+                    <select id="campo-banco"></select>
+                    <p class="dica-campo" style="margin-top: 6px;">Escolhendo o mesmo banco nos dois campos, o saldo dele não muda — é só uma reorganização, o dinheiro não saiu fisicamente de lugar nenhum.</p>
                 </div>
 
                 <div class="campo" id="campo-descricao-wrapper">
@@ -304,6 +345,25 @@
 
             <button type="button" class="botao-enviar" id="botao-salvar-editar-categoria">
                 <span class="texto-botao">Salvar alterações</span>
+                <span class="spinner-botao" hidden></span>
+            </button>
+        </div>
+    </div>
+
+    <div class="fundo-modal" id="fundo-modal-editar-pix">
+        <div class="modal-lancamento">
+            <div class="cabecalho-modal">
+                <h3>Chave PIX</h3>
+                <button class="botao-fechar-modal" id="botao-fechar-editar-pix" aria-label="Fechar">✕</button>
+            </div>
+            <p class="texto-explicativo-guardado" id="texto-editar-pix-contexto"></p>
+            <div class="campo">
+                <label for="campo-editar-chave-pix">Chave PIX de quem recebe</label>
+                <input type="text" id="campo-editar-chave-pix" placeholder="E-mail, CPF, telefone ou chave aleatória">
+            </div>
+            <div class="mensagem-aviso" id="mensagem-aviso-editar-pix" role="alert"></div>
+            <button type="button" class="botao-enviar" id="botao-salvar-editar-pix">
+                <span class="texto-botao">Salvar chave PIX</span>
                 <span class="spinner-botao" hidden></span>
             </button>
         </div>

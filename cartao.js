@@ -7,6 +7,20 @@ import {
 
 document.addEventListener("DOMContentLoaded", function () {
 
+    const listaBancosReais = document.getElementById("lista-bancos-reais");
+    const bancosReaisVazio = document.getElementById("bancos-reais-vazio");
+    const botaoAbrirNovoBancoReal = document.getElementById("botao-abrir-novo-banco-real");
+
+    const fundoModalBancoReal = document.getElementById("fundo-modal-banco-real");
+    const tituloModalBancoReal = document.getElementById("titulo-modal-banco-real");
+    const botaoFecharBancoReal = document.getElementById("botao-fechar-banco-real");
+    const campoNomeBancoReal = document.getElementById("campo-nome-banco-real");
+    const campoSaldoInicialBanco = document.getElementById("campo-saldo-inicial-banco");
+    const campoBancoPrincipal = document.getElementById("campo-banco-principal");
+    const mensagemAvisoBancoReal = document.getElementById("mensagem-aviso-banco-real");
+    const botaoSalvarBancoReal = document.getElementById("botao-salvar-banco-real");
+    const botaoRemoverBancoReal = document.getElementById("botao-remover-banco-real");
+
     const listaFaturasCartoes = document.getElementById("lista-faturas-cartoes");
     const cartoesVazio = document.getElementById("cartoes-vazio");
     const botaoAbrirNovoCartao = document.getElementById("botao-abrir-novo-cartao");
@@ -22,20 +36,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const listaItensCartao = document.getElementById("lista-itens-cartao");
     const itensCartaoVazio = document.getElementById("itens-cartao-vazio");
-    const botaoAbrirNovoItem = document.getElementById("botao-abrir-novo-item");
-
-    const fundoModalItemCartao = document.getElementById("fundo-modal-item-cartao");
-    const botaoFecharItemCartao = document.getElementById("botao-fechar-item-cartao");
-    const campoCartaoDoItem = document.getElementById("campo-cartao-do-item");
-    const campoNomeItemCartao = document.getElementById("campo-nome-item-cartao");
-    const tipoItemFixo = document.getElementById("tipo-item-fixo");
-    const tipoItemParcelado = document.getElementById("tipo-item-parcelado");
-    const campoParcelasItemCartaoWrapper = document.getElementById("campo-parcelas-item-cartao-wrapper");
-    const campoParcelasItemCartao = document.getElementById("campo-parcelas-item-cartao");
-    const rotuloValorItemCartao = document.getElementById("rotulo-valor-item-cartao");
-    const campoValorItemCartao = document.getElementById("campo-valor-item-cartao");
-    const mensagemAvisoItemCartao = document.getElementById("mensagem-aviso-item-cartao");
-    const botaoSalvarItemCartao = document.getElementById("botao-salvar-item-cartao");
 
     const fundoModalConfirmar = document.getElementById("fundo-modal-confirmar");
     const tituloModalConfirmar = document.getElementById("titulo-modal-confirmar");
@@ -50,8 +50,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let uidAtual = null;
     let listaDeCartoes = []; // [{id, nome, diaVencimento}]
+    let listaDeBancosReais = []; // [{id, nome, saldoInicial, principal}]
+    let todosOsLancamentos = []; // usado pra calcular o saldo real de cada banco
     let itensDeTodasAsFaturas = [];
     let cartaoEmEdicaoId = null;
+    let bancoRealEmEdicaoId = null;
 
     // ==========================================================================
     // TELINHA DE CONFIRMAÇÃO — substitui o confirm() feio do navegador
@@ -111,19 +114,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         escutarCartoes();
         escutarItensDeTodasAsFaturas();
-
-        const parametros = new URLSearchParams(window.location.search);
-        if (parametros.get("adicionar") === "1") {
-            // Espera os cartões carregarem antes de abrir o formulário, senão
-            // o select "Em qual cartão" abriria vazio
-            const aguardar = setInterval(() => {
-                if (listaDeCartoes.length > 0) {
-                    clearInterval(aguardar);
-                    abrirModalNovoItem();
-                }
-            }, 150);
-            setTimeout(() => clearInterval(aguardar), 3000);
-        }
+        escutarBancosReais();
+        escutarTodosOsLancamentos();
     });
 
     // ==========================================================================
@@ -134,20 +126,7 @@ document.addEventListener("DOMContentLoaded", function () {
         onSnapshot(referencia, (snapshot) => {
             listaDeCartoes = snapshot.docs.map((documento) => ({ id: documento.id, ...documento.data() }));
             renderizarFaturas();
-            popularSelectCartoes();
         });
-    }
-
-    function popularSelectCartoes() {
-        const valorAtual = campoCartaoDoItem.value;
-        campoCartaoDoItem.innerHTML = "";
-        listaDeCartoes.forEach((cartao) => {
-            const opcao = document.createElement("option");
-            opcao.value = cartao.id;
-            opcao.textContent = cartao.nome;
-            campoCartaoDoItem.appendChild(opcao);
-        });
-        if (valorAtual) campoCartaoDoItem.value = valorAtual;
     }
 
     function abrirModalCartao(cartao) {
@@ -235,7 +214,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const dados = documento.data();
             const badge = dados.origem === "parcelado"
                 ? `<span class="badge-parcela">Parcela ${dados.numeroParcela}/${dados.totalParcelas}</span>`
-                : `<span class="badge-parcela">Fixo</span>`;
+                : (dados.origem === "avulsa" ? `<span class="badge-parcela">Compra única</span>` : `<span class="badge-parcela">Fixo</span>`);
             const badgeCartaoHtml = `<span class="badge-cartao">${nomeDoCartao(dados.cartaoId)}</span>`;
 
             const item = document.createElement("li");
@@ -409,139 +388,165 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // ==========================================================================
-    // ADICIONAR ITEM NUMA FATURA
+    // BANCOS — saldo real de cada um (não é mais só "o que guardei", é o
+    // saldo de verdade: soma ganhos que chegaram ali, desconta gastos em
+    // Débito/PIX, e mais adiante vai somar/descontar as transferências do
+    // Guardar/Retirar também)
     // ==========================================================================
-    function atualizarTipoItem() {
-        const ehParcelado = tipoItemParcelado.checked;
-        campoParcelasItemCartaoWrapper.hidden = !ehParcelado;
-        campoParcelasItemCartao.required = ehParcelado;
-        rotuloValorItemCartao.textContent = ehParcelado ? "Valor total da compra" : "Valor mensal";
+    function escutarBancosReais() {
+        const referencia = collection(db, "usuarios", uidAtual, "bancos");
+        onSnapshot(referencia, (snapshot) => {
+            listaDeBancosReais = snapshot.docs.map((documento) => ({ id: documento.id, ...documento.data() }));
+            renderizarBancosReais();
+        });
     }
 
-    tipoItemFixo.addEventListener("change", atualizarTipoItem);
-    tipoItemParcelado.addEventListener("change", atualizarTipoItem);
-
-    function abrirModalNovoItem() {
-        if (listaDeCartoes.length === 0) {
-            mostrarToast("Cria um cartão primeiro, aí sim dá pra adicionar itens.");
-            return;
-        }
-        campoNomeItemCartao.value = "";
-        campoValorItemCartao.value = "";
-        campoParcelasItemCartao.value = "";
-        tipoItemFixo.checked = true;
-        popularSelectCartoes();
-        atualizarTipoItem();
-        mensagemAvisoItemCartao.classList.remove("visivel");
-        fundoModalItemCartao.classList.add("aberto");
+    // Busca TODOS os lançamentos, sem filtro de mês — o saldo do banco é
+    // acumulado desde sempre, ele não reseta todo mês como o Saldo do Mês
+    function escutarTodosOsLancamentos() {
+        const referencia = collection(db, "usuarios", uidAtual, "lancamentos");
+        onSnapshot(referencia, (snapshot) => {
+            todosOsLancamentos = snapshot.docs;
+            renderizarBancosReais();
+        });
     }
 
-    botaoAbrirNovoItem.addEventListener("click", abrirModalNovoItem);
-    botaoFecharItemCartao.addEventListener("click", () => {
-        fundoModalItemCartao.classList.remove("aberto");
+    function calcularSaldoBanco(nomeBanco, saldoInicial) {
+        let total = saldoInicial || 0;
+        todosOsLancamentos.forEach((documento) => {
+            const dados = documento.data();
+            // "Guardar Dinheiro" e "Retirada da Reserva" NUNCA entram como
+            // ganho/gasto normal aqui — são tratados como transferência,
+            // pela lógica logo abaixo. Sem essa exclusão, todo depósito no
+            // cofrinho seria contado por engano como se fosse renda de
+            // verdade, inflando o saldo do banco.
+            const ehCategoriaEspecial = dados.categoria === "Guardar Dinheiro" || dados.categoria === "Retirada da Reserva";
+
+            if (dados.tipo === "ganho" && !ehCategoriaEspecial && dados.banco === nomeBanco) {
+                total += dados.valor;
+            }
+            if (dados.tipo === "gasto" && !ehCategoriaEspecial && (dados.formaPagamento === "pix" || dados.formaPagamento === "debito") && dados.banco === nomeBanco) {
+                total -= dados.valor;
+            }
+
+            // Guardar/Retirar viram TRANSFERÊNCIA entre bancos. O campo
+            // "banco" de cada lançamento já carrega o sinal certo através
+            // do próprio valor: depósito (valor positivo, banco=destino)
+            // soma no destino; a 1ª perna da retirada (valor negativo,
+            // banco=de-onde-saiu) já desconta sozinha, só de somar; a 2ª
+            // perna "Retirada da Reserva" (valor positivo, banco=pra-onde-
+            // -voltou) soma no destino — as 4 pontas fecham a conta certa.
+            if (ehCategoriaEspecial && dados.banco === nomeBanco) {
+                total += dados.valor;
+            }
+            // Só o DEPÓSITO (valor positivo) tem "bancoOrigem" — de onde
+            // saiu o dinheiro pra ser guardado ali. Precisa descontar do
+            // lado de origem também, senão o dinheiro "nasceria do nada".
+            if (dados.categoria === "Guardar Dinheiro" && dados.valor > 0 && dados.bancoOrigem === nomeBanco) {
+                total -= dados.valor;
+            }
+        });
+        return total;
+    }
+
+    function renderizarBancosReais() {
+        listaBancosReais.innerHTML = "";
+        bancosReaisVazio.hidden = listaDeBancosReais.length > 0;
+
+        listaDeBancosReais.forEach((banco) => {
+            const saldo = calcularSaldoBanco(banco.nome, banco.saldoInicial);
+            const selo = banco.principal ? ` <span class="badge-cartao">Principal</span>` : "";
+
+            const item = document.createElement("div");
+            item.className = "fatura-cartao-item";
+            item.innerHTML = `
+                <div class="fatura-cartao-cabecalho">
+                    <span class="fatura-cartao-nome">${banco.nome}${selo}</span>
+                    <button type="button" class="link-botao-simples" data-banco="${banco.id}">Editar</button>
+                </div>
+                <span class="fatura-cartao-valor">${formatarMoeda(saldo)}</span>
+            `;
+            listaBancosReais.appendChild(item);
+        });
+    }
+
+    listaBancosReais.addEventListener("click", (evento) => {
+        const botao = evento.target.closest("[data-banco]");
+        if (!botao) return;
+        const banco = listaDeBancosReais.find((b) => b.id === botao.dataset.banco);
+        abrirModalBancoReal(banco);
     });
-    fundoModalItemCartao.addEventListener("click", (evento) => {
-        if (evento.target === fundoModalItemCartao) fundoModalItemCartao.classList.remove("aberto");
+
+    function abrirModalBancoReal(banco) {
+        bancoRealEmEdicaoId = banco ? banco.id : null;
+        tituloModalBancoReal.textContent = banco ? "Editar banco" : "Novo banco";
+        campoNomeBancoReal.value = banco ? banco.nome : "";
+        campoSaldoInicialBanco.value = banco && banco.saldoInicial ? String(banco.saldoInicial).replace(".", ",") : "";
+        campoBancoPrincipal.checked = banco ? !!banco.principal : false;
+        botaoRemoverBancoReal.hidden = !banco;
+        mensagemAvisoBancoReal.classList.remove("visivel");
+        fundoModalBancoReal.classList.add("aberto");
+    }
+
+    botaoAbrirNovoBancoReal.addEventListener("click", () => abrirModalBancoReal(null));
+    botaoFecharBancoReal.addEventListener("click", () => fundoModalBancoReal.classList.remove("aberto"));
+    fundoModalBancoReal.addEventListener("click", (evento) => {
+        if (evento.target === fundoModalBancoReal) fundoModalBancoReal.classList.remove("aberto");
     });
 
-    botaoSalvarItemCartao.addEventListener("click", async () => {
-        const cartaoId = campoCartaoDoItem.value;
-        const nome = campoNomeItemCartao.value.trim();
-        const valor = paraNumero(campoValorItemCartao.value);
-        const ehParcelado = tipoItemParcelado.checked;
-        const numeroParcelas = ehParcelado ? parseInt(campoParcelasItemCartao.value, 10) : 1;
+    botaoSalvarBancoReal.addEventListener("click", async () => {
+        const nome = campoNomeBancoReal.value.trim();
+        const saldoInicial = paraNumero(campoSaldoInicialBanco.value) || 0;
+        const principal = campoBancoPrincipal.checked;
+        mensagemAvisoBancoReal.classList.remove("visivel");
 
-        mensagemAvisoItemCartao.classList.remove("visivel");
-
-        if (!cartaoId) {
-            mensagemAvisoItemCartao.textContent = "Escolhe em qual cartão esse item entra.";
-            mensagemAvisoItemCartao.classList.add("visivel");
-            return;
-        }
         if (!nome) {
-            mensagemAvisoItemCartao.textContent = "Digita um nome pro item.";
-            mensagemAvisoItemCartao.classList.add("visivel");
-            return;
-        }
-        if (!valor || valor <= 0) {
-            mensagemAvisoItemCartao.textContent = "Digita um valor maior que zero.";
-            mensagemAvisoItemCartao.classList.add("visivel");
-            return;
-        }
-        if (ehParcelado && (!numeroParcelas || numeroParcelas < 2)) {
-            mensagemAvisoItemCartao.textContent = "Informa um número de parcelas válido (mínimo 2).";
-            mensagemAvisoItemCartao.classList.add("visivel");
+            mensagemAvisoBancoReal.textContent = "Digita um nome pro banco.";
+            mensagemAvisoBancoReal.classList.add("visivel");
             return;
         }
 
-        const spinner = botaoSalvarItemCartao.querySelector(".spinner-botao");
-        botaoSalvarItemCartao.disabled = true;
+        const spinner = botaoSalvarBancoReal.querySelector(".spinner-botao");
+        botaoSalvarBancoReal.disabled = true;
         spinner.hidden = false;
 
-        const hoje = new Date();
-        const cartaoEscolhido = listaDeCartoes.find((c) => c.id === cartaoId);
-        const diaParaRegistro = (cartaoEscolhido && cartaoEscolhido.diaVencimento) || 1;
-
-        if (ehParcelado) {
-            const valorParcela = Math.floor((valor / numeroParcelas) * 100) / 100;
-            const diferencaCentavos = Math.round((valor - valorParcela * numeroParcelas) * 100) / 100;
-            const grupoId = `parc_cartao_${Date.now()}`;
-
-            for (let indice = 0; indice < numeroParcelas; indice++) {
-                const anoDestino = hoje.getFullYear();
-                const mesDestino = hoje.getMonth() + indice;
-                const ultimoDiaDoMes = new Date(anoDestino, mesDestino + 1, 0).getDate();
-                const diaFinal = Math.min(diaParaRegistro, ultimoDiaDoMes);
-                const mesReferencia = mesReferenciaString(new Date(anoDestino, mesDestino, 1));
-                const ehUltima = indice === numeroParcelas - 1;
-                const valorDessaParcela = ehUltima ? valorParcela + diferencaCentavos : valorParcela;
-
-                await addDoc(collection(db, "usuarios", uidAtual, "pendencias"), {
-                    valor: valorDessaParcela,
-                    valorTotalCompra: valor,
-                    categoria: "Cartão de Crédito",
-                    descricao: nome,
-                    diaDoMes: diaFinal,
-                    mesReferencia,
-                    origem: "parcelado",
-                    numeroParcela: indice + 1,
-                    totalParcelas: numeroParcelas,
-                    grupoId,
-                    noCartao: true,
-                    cartaoId,
-                    pago: false,
-                    criadoEm: serverTimestamp()
-                });
-            }
-        } else {
-            const grupoId = `fixo_cartao_${Date.now()}`;
-            for (let indice = 0; indice < 12; indice++) {
-                const anoDestino = hoje.getFullYear();
-                const mesDestino = hoje.getMonth() + indice;
-                const ultimoDiaDoMes = new Date(anoDestino, mesDestino + 1, 0).getDate();
-                const diaFinal = Math.min(diaParaRegistro, ultimoDiaDoMes);
-                const mesReferencia = mesReferenciaString(new Date(anoDestino, mesDestino, 1));
-
-                await addDoc(collection(db, "usuarios", uidAtual, "pendencias"), {
-                    valor,
-                    categoria: "Cartão de Crédito",
-                    descricao: nome,
-                    diaDoMes: diaFinal,
-                    mesReferencia,
-                    origem: "fixo",
-                    grupoId,
-                    noCartao: true,
-                    cartaoId,
-                    pago: false,
-                    criadoEm: serverTimestamp()
-                });
-            }
+        // Só um banco pode ser "principal" por vez — desmarca qualquer
+        // outro que já estivesse marcado antes de salvar esse
+        if (principal) {
+            const lote = writeBatch(db);
+            let mudouAlgo = false;
+            listaDeBancosReais.forEach((banco) => {
+                if (banco.principal && banco.id !== bancoRealEmEdicaoId) {
+                    lote.update(doc(db, "usuarios", uidAtual, "bancos", banco.id), { principal: false });
+                    mudouAlgo = true;
+                }
+            });
+            if (mudouAlgo) await lote.commit();
         }
 
-        botaoSalvarItemCartao.disabled = false;
+        if (bancoRealEmEdicaoId) {
+            await updateDoc(doc(db, "usuarios", uidAtual, "bancos", bancoRealEmEdicaoId), { nome, saldoInicial, principal });
+        } else {
+            await addDoc(collection(db, "usuarios", uidAtual, "bancos"), { nome, saldoInicial, principal });
+        }
+
+        botaoSalvarBancoReal.disabled = false;
         spinner.hidden = true;
-        fundoModalItemCartao.classList.remove("aberto");
-        mostrarToast("Item adicionado ✓");
+        fundoModalBancoReal.classList.remove("aberto");
+        mostrarToast("Banco salvo ✓");
+    });
+
+    botaoRemoverBancoReal.addEventListener("click", async () => {
+        if (!bancoRealEmEdicaoId) return;
+        const confirmou = await confirmarComTelinha(
+            "Tem certeza de que deseja remover esse banco? O histórico de lançamentos continua salvo normalmente.",
+            "Remover banco"
+        );
+        if (!confirmou) return;
+
+        await deleteDoc(doc(db, "usuarios", uidAtual, "bancos", bancoRealEmEdicaoId));
+        fundoModalBancoReal.classList.remove("aberto");
+        mostrarToast("Banco removido");
     });
 
 });

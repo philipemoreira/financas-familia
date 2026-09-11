@@ -25,19 +25,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const spinnerMeta = botaoSalvarMeta.querySelector(".spinner-botao");
     const botaoRemoverMeta = document.getElementById("botao-remover-meta");
 
-    const listaBancos = document.getElementById("lista-bancos");
-    const bancosVazio = document.getElementById("bancos-vazio");
-    const botaoAbrirNovoBanco = document.getElementById("botao-abrir-novo-banco");
-
-    const fundoModalBanco = document.getElementById("fundo-modal-banco");
-    const tituloModalBanco = document.getElementById("titulo-modal-banco");
-    const botaoFecharBanco = document.getElementById("botao-fechar-banco");
-    const campoNomeBanco = document.getElementById("campo-nome-banco");
-    const mensagemAvisoBanco = document.getElementById("mensagem-aviso-banco");
-    const botaoSalvarBanco = document.getElementById("botao-salvar-banco");
-    const spinnerBanco = botaoSalvarBanco.querySelector(".spinner-botao");
-    const botaoRemoverBanco = document.getElementById("botao-remover-banco");
-
     const botaoAbrirRetirada = document.getElementById("botao-abrir-retirada");
     const botaoFecharRetirada = document.getElementById("botao-fechar-retirada");
     const fundoModalRetirada = document.getElementById("fundo-modal-retirada");
@@ -47,6 +34,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const campoMetaRetirada = document.getElementById("campo-meta-retirada");
     const campoBancoRetiradaWrapper = document.getElementById("campo-banco-retirada-wrapper");
     const campoBancoRetirada = document.getElementById("campo-banco-retirada");
+    const campoBancoDestinoRetiradaWrapper = document.getElementById("campo-banco-destino-retirada-wrapper");
+    const campoBancoDestinoRetirada = document.getElementById("campo-banco-destino-retirada");
     const mensagemAvisoRetirada = document.getElementById("mensagem-aviso-retirada");
     const botaoConfirmarRetirada = document.getElementById("botao-confirmar-retirada");
     const spinnerRetirada = botaoConfirmarRetirada.querySelector(".spinner-botao");
@@ -157,7 +146,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
             todosOsDepositos = documentosOrdenados;
             renderizarMetas(); // os totais por meta dependem dos depósitos também
-            renderizarBancos(); // idem pros bancos
         });
     }
 
@@ -287,102 +275,18 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // ==========================================================================
-    // BANCOS — onde o dinheiro guardado fica de verdade, com o total corrente
-    // (sem valor-alvo, banco não tem "meta", só mostra quanto tem lá)
+    // BANCOS — a gestão (criar/editar/remover) mudou de lugar, agora mora
+    // na tela "Bancos e Cartões". Aqui só carregamos a lista, pra continuar
+    // populando o seletor "de qual banco" na hora de Retirar.
     // ==========================================================================
     let listaDeBancos = []; // [{id, nome}]
-    let bancoEmEdicaoId = null;
 
     function escutarBancos() {
         const referencia = collection(db, "usuarios", uidAtual, "bancos");
         onSnapshot(referencia, (snapshot) => {
             listaDeBancos = snapshot.docs.map((documento) => ({ id: documento.id, ...documento.data() }));
-            renderizarBancos();
         });
     }
-
-    function totalGuardadoNoBanco(nomeDoBanco) {
-        // Soma TUDO que tem esse banco marcado — depósitos (positivos) E
-        // retiradas (negativas) — senão o total nunca diminuía ao retirar
-        return todosOsDepositos
-            .filter((documento) => documento.data().banco === nomeDoBanco)
-            .reduce((soma, documento) => soma + documento.data().valor, 0);
-    }
-
-    function renderizarBancos() {
-        listaBancos.innerHTML = "";
-        bancosVazio.hidden = listaDeBancos.length > 0;
-
-        listaDeBancos.forEach((banco) => {
-            const totalNoBanco = totalGuardadoNoBanco(banco.nome);
-
-            const item = document.createElement("li");
-            item.className = "item-conta";
-            item.style.flexDirection = "column";
-            item.style.alignItems = "stretch";
-            item.innerHTML = `
-                <div style="display:flex; align-items:center; justify-content: space-between; width: 100%;">
-                    <span class="nome-conta">${banco.nome}</span>
-                    <button type="button" class="link-editar-meta" data-id="${banco.id}">Editar</button>
-                </div>
-                <div class="texto-barra-orcamento">${formatarMoeda(totalNoBanco)} guardado</div>
-            `;
-            item.querySelector(".link-editar-meta").addEventListener("click", () => abrirModalBanco(banco));
-            listaBancos.appendChild(item);
-        });
-    }
-
-    function abrirModalBanco(banco) {
-        bancoEmEdicaoId = banco ? banco.id : null;
-        tituloModalBanco.textContent = banco ? "Editar banco" : "Novo banco";
-        campoNomeBanco.value = banco ? banco.nome : "";
-        botaoRemoverBanco.hidden = !banco;
-        mensagemAvisoBanco.classList.remove("visivel");
-        fundoModalBanco.classList.add("aberto");
-    }
-
-    function fecharModalBanco() {
-        fundoModalBanco.classList.remove("aberto");
-    }
-
-    botaoAbrirNovoBanco.addEventListener("click", () => abrirModalBanco(null));
-    botaoFecharBanco.addEventListener("click", fecharModalBanco);
-    fundoModalBanco.addEventListener("click", (evento) => {
-        if (evento.target === fundoModalBanco) fecharModalBanco();
-    });
-
-    botaoSalvarBanco.addEventListener("click", async () => {
-        const nome = campoNomeBanco.value.trim();
-        mensagemAvisoBanco.classList.remove("visivel");
-
-        if (!nome) {
-            mensagemAvisoBanco.textContent = "Digita um nome pro banco.";
-            mensagemAvisoBanco.classList.add("visivel");
-            return;
-        }
-
-        botaoSalvarBanco.disabled = true;
-        spinnerBanco.hidden = false;
-
-        if (bancoEmEdicaoId) {
-            await updateDoc(doc(db, "usuarios", uidAtual, "bancos", bancoEmEdicaoId), { nome });
-        } else {
-            await addDoc(collection(db, "usuarios", uidAtual, "bancos"), { nome });
-        }
-
-        botaoSalvarBanco.disabled = false;
-        spinnerBanco.hidden = true;
-        fecharModalBanco();
-    });
-
-    botaoRemoverBanco.addEventListener("click", async () => {
-        if (!bancoEmEdicaoId) return;
-        const confirmou = await confirmarComTelinha("Tem certeza de que deseja remover esse banco? O histórico de depósitos continua salvo normalmente.");
-        if (!confirmou) return;
-
-        await deleteDoc(doc(db, "usuarios", uidAtual, "bancos", bancoEmEdicaoId));
-        fecharModalBanco();
-    });
 
     // ==========================================================================
     // RETIRAR DINHEIRO — cria 2 registros: um reduzindo o guardado (valor
@@ -432,8 +336,28 @@ document.addEventListener("DOMContentLoaded", function () {
                 opcao.textContent = banco.nome;
                 campoBancoRetirada.appendChild(opcao);
             });
+
+            // Mesma lista, pro campo de destino — a retirada volta pra
+            // algum banco (normalmente o principal, onde você vai gastar)
+            campoBancoDestinoRetiradaWrapper.hidden = false;
+            campoBancoDestinoRetirada.innerHTML = "";
+
+            const opcaoNaoEspecificarDestino = document.createElement("option");
+            opcaoNaoEspecificarDestino.value = "";
+            opcaoNaoEspecificarDestino.textContent = "Não especificar";
+            campoBancoDestinoRetirada.appendChild(opcaoNaoEspecificarDestino);
+
+            listaDeBancos.forEach((banco) => {
+                const opcao = document.createElement("option");
+                opcao.value = banco.nome;
+                opcao.textContent = banco.nome;
+                campoBancoDestinoRetirada.appendChild(opcao);
+            });
         } else {
             campoBancoRetiradaWrapper.hidden = true;
+            campoBancoRetirada.innerHTML = "";
+            campoBancoDestinoRetiradaWrapper.hidden = true;
+            campoBancoDestinoRetirada.innerHTML = "";
         }
 
         fundoModalRetirada.classList.add("aberto");
@@ -476,12 +400,15 @@ document.addEventListener("DOMContentLoaded", function () {
         spinnerRetirada.hidden = false;
 
         const bancoEscolhidoRetirada = campoBancoRetirada.value || null;
+        const bancoDestinoEscolhidoRetirada = campoBancoDestinoRetirada.value || null;
         const metaEscolhidaRetirada = campoMetaRetirada.value || null;
         const agora = new Date();
 
         // 1) Reduz o total guardado (valor negativo, mesma categoria) — marca
         // o banco/meta escolhidos, senão os totais nunca diminuíam na
-        // retirada (ficavam só somando os depósitos, sem nunca descontar)
+        // retirada (ficavam só somando os depósitos, sem nunca descontar).
+        // Esse "banco" aqui é de onde o dinheiro estava guardado — o saldo
+        // real dele desce, exatamente como uma transferência de verdade.
         await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
             tipo: "gasto",
             valor: -valor,
@@ -496,12 +423,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // 2) Injeta o valor de volta no saldo principal (horário capturado de
         // novo aqui, pra nunca nascer com o mesmo timestamp exato do registro
-        // acima — evita ambiguidade na ordenação por data)
+        // acima — evita ambiguidade na ordenação por data). O banco aqui é
+        // pra ONDE o dinheiro volta — o saldo real dele sobe, fechando a
+        // transferência (o que desceu de um lado, sobe do outro).
         await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
             tipo: "ganho",
             valor: valor,
             categoria: "Retirada da Reserva",
             descricao: "",
+            banco: bancoDestinoEscolhidoRetirada,
             data: Timestamp.fromDate(new Date()),
             mesReferencia: mesReferenciaString(new Date()),
             criadoEm: serverTimestamp()

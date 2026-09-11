@@ -54,10 +54,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const listaVazia = document.getElementById("lista-vazia");
     const listaPendencias = document.getElementById("lista-pendencias");
     const pendenciasVazio = document.getElementById("pendencias-vazio");
+    const botaoVerMaisPendencias = document.getElementById("botao-ver-mais-pendencias");
     const secaoFaturaCartao = document.getElementById("secao-fatura-cartao");
     const tituloFaturaCartao = document.getElementById("titulo-fatura-cartao");
     const valorFaturaCartao = document.getElementById("valor-fatura-cartao");
     const vencimentoFaturaCartao = document.getElementById("vencimento-fatura-cartao");
+    const linkResumoFatura = document.getElementById("link-resumo-fatura");
+    const linkResumoBancos = document.getElementById("link-resumo-bancos");
+    const etiquetaBancoPrincipal = document.getElementById("etiqueta-banco-principal");
+    const valorTotalBancos = document.getElementById("valor-total-bancos");
     const linkExtrato = document.getElementById("link-extrato");
 
     const fundoModalEditarCategoria = document.getElementById("fundo-modal-editar-categoria");
@@ -74,6 +79,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const toast = document.getElementById("toast");
     const toastMensagem = document.getElementById("toast-mensagem");
     const toastBotaoAcao = document.getElementById("toast-botao-acao");
+    const fundoModalEditarPix = document.getElementById("fundo-modal-editar-pix");
+    const botaoFecharEditarPix = document.getElementById("botao-fechar-editar-pix");
+    const textoEditarPixContexto = document.getElementById("texto-editar-pix-contexto");
+    const campoEditarChavePix = document.getElementById("campo-editar-chave-pix");
+    const mensagemAvisoEditarPix = document.getElementById("mensagem-aviso-editar-pix");
+    const botaoSalvarEditarPix = document.getElementById("botao-salvar-editar-pix");
+
     const fundoModalConfirmar = document.getElementById("fundo-modal-confirmar");
     const tituloModalConfirmar = document.getElementById("titulo-modal-confirmar");
     const textoModalConfirmar = document.getElementById("texto-modal-confirmar");
@@ -135,10 +147,20 @@ document.addEventListener("DOMContentLoaded", function () {
     const campoNovaCategoria = document.getElementById("campo-nova-categoria");
     const campoVencimentoNovaCategoriaWrapper = document.getElementById("campo-vencimento-nova-categoria-wrapper");
     const campoVencimentoNovaCategoria = document.getElementById("campo-vencimento-nova-categoria");
+    const campoBancoOrigemWrapper = document.getElementById("campo-banco-origem-wrapper");
+    const campoBancoOrigem = document.getElementById("campo-banco-origem");
     const campoBancoWrapper = document.getElementById("campo-banco-wrapper");
     const campoBanco = document.getElementById("campo-banco");
-    const campoNovoBancoWrapper = document.getElementById("campo-novo-banco-wrapper");
-    const campoNovoBanco = document.getElementById("campo-novo-banco");
+    const campoFormaPagamentoWrapper = document.getElementById("campo-forma-pagamento-wrapper");
+    const rotuloFormaPagamento = document.getElementById("rotulo-forma-pagamento");
+    const campoFormaPagamento = document.getElementById("campo-forma-pagamento");
+    const campoBancoPagamentoWrapper = document.getElementById("campo-banco-pagamento-wrapper");
+    const campoChavePixWrapper = document.getElementById("campo-chave-pix-wrapper");
+    const campoChavePix = document.getElementById("campo-chave-pix");
+    const rotuloBancoPagamento = document.getElementById("rotulo-banco-pagamento");
+    const campoBancoPagamento = document.getElementById("campo-banco-pagamento");
+    const campoCartaoPagamentoWrapper = document.getElementById("campo-cartao-pagamento-wrapper");
+    const campoCartaoPagamento = document.getElementById("campo-cartao-pagamento");
     const campoDescricaoWrapper = document.getElementById("campo-descricao-wrapper");
     const campoDescricao = document.getElementById("campo-descricao");
     const campoData = document.getElementById("campo-data");
@@ -190,6 +212,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let categoriasCustomizadas = { gasto: [], ganho: [] };
     let metasCustomizadas = []; // [{nome, id}] — usadas só no fluxo de Guardar
     let bancosCustomizados = []; // [{nome, id}] — onde o dinheiro guardado fica de verdade
+    let cartoesCustomizados = []; // [{nome, diaVencimento, id}] — cartões de crédito cadastrados
     let pararDeEscutar = null;
     let pararDeEscutarSalario = null;
     let salarioPadrao = 0;
@@ -230,6 +253,8 @@ document.addEventListener("DOMContentLoaded", function () {
         await carregarOrcamentos();
         await carregarMetas();
         await carregarBancos();
+        await atualizarResumoBancos();
+        await carregarCartoes();
         if (!perfil.migracaoMesReferenciaConcluida) await migrarLancamentosAntigos();
         atualizarRotuloMes();
         escutarLancamentosDoMes();
@@ -535,6 +560,130 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    // Soma o saldo real de TODOS os bancos, pro card-resumo da tela inicial.
+    // Busca uma vez só (não fica ouvindo em tempo real) — é só um resumo,
+    // não precisa atualizar sozinho a cada segundo, e evita pesar a tela
+    // mais visitada do app com uma busca grande toda hora.
+    async function atualizarResumoBancos() {
+        const referenciaBancos = collection(db, "usuarios", uidAtual, "bancos");
+        const snapshotBancos = await getDocs(referenciaBancos);
+
+        // Etiqueta do Saldo do Mês, mostrando qual banco é o "principal" —
+        // só uma etiqueta visual, não muda o cálculo do saldo em nada
+        const bancoPrincipal = snapshotBancos.docs.find((documento) => documento.data().principal === true);
+        if (bancoPrincipal) {
+            etiquetaBancoPrincipal.textContent = `Saldo do mês · ${bancoPrincipal.data().nome}`;
+            etiquetaBancoPrincipal.hidden = false;
+        } else {
+            etiquetaBancoPrincipal.hidden = true;
+        }
+
+        if (snapshotBancos.empty) {
+            linkResumoBancos.hidden = true;
+            atualizarVisibilidadeSecaoBancosCartoes();
+            return;
+        }
+
+        const referenciaLancamentos = collection(db, "usuarios", uidAtual, "lancamentos");
+        const snapshotLancamentos = await getDocs(referenciaLancamentos);
+
+        let totalGeral = 0;
+        snapshotBancos.forEach((bancoDoc) => {
+            const banco = bancoDoc.data();
+            let saldoBanco = banco.saldoInicial || 0;
+
+            snapshotLancamentos.forEach((lancDoc) => {
+                const dados = lancDoc.data();
+                const ehCategoriaEspecial = dados.categoria === "Guardar Dinheiro" || dados.categoria === "Retirada da Reserva";
+
+                if (dados.tipo === "ganho" && !ehCategoriaEspecial && dados.banco === banco.nome) {
+                    saldoBanco += dados.valor;
+                }
+                if (dados.tipo === "gasto" && !ehCategoriaEspecial && (dados.formaPagamento === "pix" || dados.formaPagamento === "debito") && dados.banco === banco.nome) {
+                    saldoBanco -= dados.valor;
+                }
+                if (ehCategoriaEspecial && dados.banco === banco.nome) {
+                    saldoBanco += dados.valor;
+                }
+                if (dados.categoria === "Guardar Dinheiro" && dados.valor > 0 && dados.bancoOrigem === banco.nome) {
+                    saldoBanco -= dados.valor;
+                }
+            });
+
+            totalGeral += saldoBanco;
+        });
+
+        linkResumoBancos.hidden = false;
+        valorTotalBancos.textContent = formatarMoeda(totalGeral);
+        atualizarVisibilidadeSecaoBancosCartoes();
+    }
+
+    async function carregarCartoes() {
+        const referencia = collection(db, "usuarios", uidAtual, "cartoes");
+        const resultado = await getDocs(referencia);
+
+        cartoesCustomizados = [];
+        resultado.forEach((documento) => {
+            cartoesCustomizados.push({ nome: documento.data().nome, diaVencimento: documento.data().diaVencimento, id: documento.id });
+        });
+    }
+
+    function popularSelectBancoPagamento() {
+        campoBancoPagamento.innerHTML = "";
+
+        if (bancosCustomizados.length === 0) {
+            const opcaoVazia = document.createElement("option");
+            opcaoVazia.value = "";
+            opcaoVazia.disabled = true;
+            opcaoVazia.selected = true;
+            opcaoVazia.textContent = "Cria um banco primeiro (menu → Bancos e Cartões)";
+            campoBancoPagamento.appendChild(opcaoVazia);
+            return;
+        }
+
+        const opcaoPlaceholder = document.createElement("option");
+        opcaoPlaceholder.value = "";
+        opcaoPlaceholder.disabled = true;
+        opcaoPlaceholder.selected = true;
+        opcaoPlaceholder.textContent = "Selecione...";
+        campoBancoPagamento.appendChild(opcaoPlaceholder);
+
+        bancosCustomizados.forEach((banco) => {
+            const opcao = document.createElement("option");
+            opcao.value = banco.nome;
+            opcao.textContent = banco.nome;
+            campoBancoPagamento.appendChild(opcao);
+        });
+    }
+
+    function popularSelectCartaoPagamento() {
+        campoCartaoPagamento.innerHTML = "";
+
+        if (cartoesCustomizados.length === 0) {
+            const opcaoVazia = document.createElement("option");
+            opcaoVazia.value = "";
+            opcaoVazia.disabled = true;
+            opcaoVazia.selected = true;
+            opcaoVazia.textContent = "Cria um cartão primeiro (menu → Bancos e Cartões)";
+            campoCartaoPagamento.appendChild(opcaoVazia);
+            return;
+        }
+
+        const opcaoPlaceholder = document.createElement("option");
+        opcaoPlaceholder.value = "";
+        opcaoPlaceholder.disabled = true;
+        opcaoPlaceholder.selected = true;
+        opcaoPlaceholder.textContent = "Selecione...";
+        campoCartaoPagamento.appendChild(opcaoPlaceholder);
+
+        cartoesCustomizados.forEach((cartao) => {
+            const opcao = document.createElement("option");
+            opcao.value = cartao.id;
+            opcao.textContent = cartao.nome;
+            campoCartaoPagamento.appendChild(opcao);
+        });
+    }
+
     function popularSelectCategorias(categoriaAtual) {
         campoCategoria.innerHTML = "";
 
@@ -601,25 +750,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // O banco tem um select PRÓPRIO (não reaproveita o de categoria/meta),
     // porque no modo Guardar os dois campos aparecem juntos na tela
-    function popularSelectBancos() {
-        campoBanco.innerHTML = "";
+    // Popula um select de banco (usada tanto pro "De qual banco sai" quanto
+    // pro "Para qual banco vai") — bancos agora só se criam na tela "Bancos
+    // e Cartões" (onde já entram com saldo inicial certo), por isso não tem
+    // mais opção de "+ Novo banco" direto aqui
+    function popularSelectBancoGenerico(selectAlvo) {
+        selectAlvo.innerHTML = "";
 
         const opcaoSemBanco = document.createElement("option");
         opcaoSemBanco.value = "__sem_banco__";
         opcaoSemBanco.textContent = "Sem banco específico";
-        campoBanco.appendChild(opcaoSemBanco);
+        selectAlvo.appendChild(opcaoSemBanco);
 
         bancosCustomizados.forEach((banco) => {
             const opcao = document.createElement("option");
             opcao.value = banco.nome;
             opcao.textContent = banco.nome;
-            campoBanco.appendChild(opcao);
+            selectAlvo.appendChild(opcao);
         });
-
-        const opcaoNovo = document.createElement("option");
-        opcaoNovo.value = "__novo__";
-        opcaoNovo.textContent = "+ Novo banco";
-        campoBanco.appendChild(opcaoNovo);
     }
 
     // Mostra a lixeira e o lápis só quando a categoria selecionada no momento
@@ -641,12 +789,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const jaPerguntaVencimentoAliBaixo = campoFixo.checked || campoParcelado.checked;
         campoVencimentoNovaCategoriaWrapper.hidden = !criandoNova || tipoSelecionado !== "gasto" || jaPerguntaVencimentoAliBaixo;
         atualizarBotaoExcluirCategoria();
-    });
-
-    campoBanco.addEventListener("change", () => {
-        const criandoNovo = campoBanco.value === "__novo__";
-        campoNovoBancoWrapper.hidden = !criandoNovo;
-        campoNovoBanco.required = criandoNovo;
     });
 
     botaoExcluirCategoria.addEventListener("click", async () => {
@@ -801,9 +943,18 @@ document.addEventListener("DOMContentLoaded", function () {
                     );
                     const pendenciasParaAtualizar = await getDocs(consultaPendenciasVencimento);
 
-                    if (!pendenciasParaAtualizar.empty) {
+                    // Itens "no cartão" NÃO entram aqui — o vencimento deles
+                    // vem sempre do próprio cartão escolhido, nunca da
+                    // categoria. Sem esse filtro, editar o vencimento de uma
+                    // categoria comum ia bagunçar compras no crédito que só
+                    // por acaso compartilham a mesma categoria.
+                    const pendenciasComunsParaAtualizar = pendenciasParaAtualizar.docs.filter(
+                        (documento) => !documento.data().noCartao
+                    );
+
+                    if (pendenciasComunsParaAtualizar.length > 0) {
                         const loteVencimento = writeBatch(db);
-                        pendenciasParaAtualizar.forEach((documento) => {
+                        pendenciasComunsParaAtualizar.forEach((documento) => {
                             loteVencimento.update(documento.ref, { diaDoMes: novoVencimento });
                         });
                         await loteVencimento.commit();
@@ -853,9 +1004,12 @@ document.addEventListener("DOMContentLoaded", function () {
         campoVencimentoLancamentoWrapper.hidden = true;
         campoVencimentoLancamento.required = false;
         campoVencimentoLancamento.value = "";
+        campoBancoOrigemWrapper.hidden = true;
+        campoBancoOrigem.required = false;
         campoBancoWrapper.hidden = true;
-        campoNovoBancoWrapper.hidden = true;
-        campoNovoBanco.required = false;
+        campoBanco.required = false;
+        campoChavePixWrapper.hidden = true;
+        campoChavePix.value = "";
         campoFixo.checked = false;
         campoFixo.disabled = false;
         campoParcelado.checked = false;
@@ -898,6 +1052,43 @@ document.addEventListener("DOMContentLoaded", function () {
         campoNovaCategoria.required = false;
         campoParcelas.required = false;
 
+        // Forma de pagamento/banco só entram na edição pra Gasto e Extra
+        // "normais" — Guardar tem campo próprio, e a Fatura do Cartão é um
+        // agregado especial que não faz sentido reclassificar por aqui
+        const ehCategoriaEspecial = dados.categoria === "Guardar Dinheiro" || dados.categoria === "Retirada da Reserva" || dados.categoria === "Fatura do Cartão";
+        campoFormaPagamentoWrapper.hidden = true;
+        campoFormaPagamento.required = false;
+        campoBancoPagamentoWrapper.hidden = true;
+        campoBancoPagamento.required = false;
+        campoCartaoPagamentoWrapper.hidden = true;
+        campoCartaoPagamento.required = false;
+
+        if (!ehCategoriaEspecial && dados.tipo === "gasto") {
+            campoFormaPagamentoWrapper.hidden = false;
+            campoFormaPagamento.required = true;
+            // Não oferece "Crédito" na edição — compras no crédito têm um
+            // fluxo próprio (viram pendência, depois fatura), não faz
+            // sentido reclassificar um lançamento já feito pra lá
+            Array.from(campoFormaPagamento.options).forEach((opcao) => {
+                opcao.hidden = opcao.value === "credito";
+            });
+            campoFormaPagamento.value = dados.formaPagamento || "";
+
+            if (dados.formaPagamento === "pix" || dados.formaPagamento === "debito") {
+                rotuloBancoPagamento.textContent = "De qual banco";
+                popularSelectBancoGenerico(campoBancoPagamento);
+                campoBancoPagamentoWrapper.hidden = false;
+                campoBancoPagamento.required = true;
+                campoBancoPagamento.value = dados.banco || "__sem_banco__";
+            }
+        } else if (!ehCategoriaEspecial && dados.tipo === "ganho") {
+            rotuloBancoPagamento.textContent = "Em qual banco entrou";
+            popularSelectBancoPagamento();
+            campoBancoPagamentoWrapper.hidden = false;
+            campoBancoPagamento.required = true;
+            campoBancoPagamento.value = dados.banco || "";
+        }
+
         fundoModal.classList.add("aberto");
     }
 
@@ -907,13 +1098,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function irParaFormulario(tipoClicado) {
-        // "Cartão" não é um lançamento normal — leva direto pra tela própria
-        // do cartão, já com o formulário de adicionar item aberto
-        if (tipoClicado === "cartao") {
-            window.location.href = "cartao.html?adicionar=1";
-            return;
-        }
-
         // "guardar" não é um tipo de lançamento de verdade — por baixo dos
         // panos ele é um "ganho" com categoria fixa "Guardar Dinheiro".
         // "extra" também é só o nome do botão — internamente é "ganho" também.
@@ -931,6 +1115,27 @@ document.addEventListener("DOMContentLoaded", function () {
         botaoTrocarTipo.textContent = rotulosBotaoTrocar[tipoClicado];
         rotuloValor.textContent = "Valor";
         opcoesEspeciaisGasto.hidden = tipoClicado !== "gasto";
+
+        // Forma de pagamento só existe em Gasto. Extra não pergunta "forma"
+        // (não faz sentido pra quem tá recebendo) — pergunta só "em qual
+        // banco entrou", direto, reaproveitando o mesmo campo de banco.
+        // Reexibe "Crédito" caso tenha ficado escondido de uma edição
+        // anterior (lá, ela não aparece de propósito)
+        Array.from(campoFormaPagamento.options).forEach((opcao) => { opcao.hidden = false; });
+        campoFormaPagamentoWrapper.hidden = tipoClicado !== "gasto";
+        campoFormaPagamento.required = tipoClicado === "gasto";
+        campoFormaPagamento.value = "";
+        campoBancoPagamentoWrapper.hidden = true;
+        campoBancoPagamento.required = false;
+        campoCartaoPagamentoWrapper.hidden = true;
+        campoCartaoPagamento.required = false;
+
+        if (tipoClicado === "extra") {
+            rotuloBancoPagamento.textContent = "Em qual banco entrou";
+            campoBancoPagamentoWrapper.hidden = false;
+            campoBancoPagamento.required = true;
+            popularSelectBancoPagamento();
+        }
 
         // No modo Guardar, o campo vira "Meta" em vez de "Categoria" —
         // reaproveita o mesmo select, só troca o rótulo e o conteúdo.
@@ -954,12 +1159,18 @@ document.addEventListener("DOMContentLoaded", function () {
             popularSelectCategorias();
         }
 
-        // O campo Banco só aparece no modo Guardar, junto com a Meta —
-        // representa ONDE o dinheiro fica de verdade (Nubank, Caixa, etc)
+        // Os campos de banco só aparecem no modo Guardar, junto com a Meta —
+        // "De qual banco sai" e "Para qual banco vai" representam a
+        // transferência de verdade entre bancos (ou dentro do mesmo banco,
+        // se a pessoa só quer separar mentalmente, sem mover de verdade)
+        campoBancoOrigemWrapper.hidden = !modoGuardar;
+        campoBancoOrigem.required = modoGuardar;
         campoBancoWrapper.hidden = !modoGuardar;
-        campoNovoBancoWrapper.hidden = true;
-        campoNovoBanco.required = false;
-        if (modoGuardar) popularSelectBancos();
+        campoBanco.required = modoGuardar;
+        if (modoGuardar) {
+            popularSelectBancoGenerico(campoBancoOrigem);
+            popularSelectBancoGenerico(campoBanco);
+        }
 
         campoDescricaoWrapper.hidden = modoGuardar;
         campoDescricao.required = false;
@@ -1016,6 +1227,35 @@ document.addEventListener("DOMContentLoaded", function () {
         if (evento.target === fundoModal) fecharModal();
     });
 
+    campoFormaPagamento.addEventListener("change", () => {
+        const formaEscolhida = campoFormaPagamento.value;
+        rotuloBancoPagamento.textContent = "De qual banco";
+
+        if (formaEscolhida === "pix" || formaEscolhida === "debito") {
+            campoBancoPagamentoWrapper.hidden = false;
+            campoBancoPagamento.required = true;
+            campoCartaoPagamentoWrapper.hidden = true;
+            campoCartaoPagamento.required = false;
+            popularSelectBancoPagamento();
+        } else if (formaEscolhida === "credito") {
+            campoBancoPagamentoWrapper.hidden = true;
+            campoBancoPagamento.required = false;
+            campoCartaoPagamentoWrapper.hidden = false;
+            campoCartaoPagamento.required = true;
+            popularSelectCartaoPagamento();
+        } else {
+            // Dinheiro — nenhum dos dois é perguntado
+            campoBancoPagamentoWrapper.hidden = true;
+            campoBancoPagamento.required = false;
+            campoCartaoPagamentoWrapper.hidden = true;
+            campoCartaoPagamento.required = false;
+        }
+
+        // O campo de vencimento manual depende de saber se é Crédito ou
+        // não (Crédito usa o vencimento do próprio cartão)
+        atualizarVisibilidadeParcelas();
+    });
+
     campoFixo.addEventListener("change", () => {
         if (campoFixo.checked) campoParcelado.checked = false;
         atualizarVisibilidadeParcelas();
@@ -1040,7 +1280,11 @@ document.addEventListener("DOMContentLoaded", function () {
         // Ele se MOVE pra logo abaixo do checkbox marcado, em vez de ficar
         // sempre no mesmo lugar (fixo embaixo dos dois checkboxes) — assim
         // fica claro que é sobre a opção que você acabou de marcar.
-        const precisaVencimento = campoFixo.checked || campoParcelado.checked;
+        // EXCEÇÃO: se a forma de pagamento for Crédito, esse campo nem
+        // aparece — o vencimento já vem do próprio cartão escolhido,
+        // perguntar de novo aqui seria repetir a mesma coisa duas vezes.
+        const noCredito = campoFormaPagamento.value === "credito";
+        const precisaVencimento = (campoFixo.checked || campoParcelado.checked) && !noCredito;
         campoVencimentoLancamentoWrapper.hidden = !precisaVencimento;
         campoVencimentoLancamento.required = precisaVencimento;
 
@@ -1059,6 +1303,12 @@ document.addEventListener("DOMContentLoaded", function () {
         // esconde ele agora que Fixo/Parcelado já pergunta isso ali embaixo
         // (evita perguntar o mesmo dia duas vezes, em lugares diferentes)
         if (precisaVencimento) campoVencimentoNovaCategoriaWrapper.hidden = true;
+
+        // Chave PIX de quem recebe — só faz sentido pra Fixo/Parcelado
+        // pagos via PIX especificamente (não em Débito, não em Crédito,
+        // que usam a chave do próprio cartão/banco, não de terceiros)
+        const mostrarChavePix = (campoFixo.checked || campoParcelado.checked) && campoFormaPagamento.value === "pix";
+        campoChavePixWrapper.hidden = !mostrarChavePix;
     }
 
     // Mostra "= 6x de R$ 8,33" em tempo real, assim que a pessoa digita o
@@ -1139,6 +1389,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let categoriaFinal = campoCategoria.value;
         let metaFinal = null;
         let bancoFinal = null;
+        let bancoOrigemFinal = null;
 
         if (modoGuardar) {
             if (categoriaFinal === "__nova__") {
@@ -1155,18 +1406,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             categoriaFinal = "Guardar Dinheiro";
 
-            if (campoBanco.value === "__novo__") {
-                const novoBanco = campoNovoBanco.value.trim();
-                if (!novoBanco) {
-                    mostrarAviso("Digita o nome do novo banco.");
-                    return;
-                }
-                bancoFinal = novoBanco;
-            } else if (campoBanco.value === "__sem_banco__") {
-                bancoFinal = null;
-            } else {
-                bancoFinal = campoBanco.value;
-            }
+            bancoFinal = campoBanco.value === "__sem_banco__" ? null : campoBanco.value;
+            bancoOrigemFinal = campoBancoOrigem.value === "__sem_banco__" ? null : campoBancoOrigem.value;
         } else if (categoriaFinal === "__nova__") {
             const nomeNovaCategoria = campoNovaCategoria.value.trim();
             if (!nomeNovaCategoria) {
@@ -1193,12 +1434,27 @@ document.addEventListener("DOMContentLoaded", function () {
                     categoriasCustomizadas[tipoSelecionado].push({ nome: categoriaFinal, id: referenciaCategoria.id });
                 }
 
-                await updateDoc(doc(db, "usuarios", uidAtual, "lancamentos", idEmEdicao), {
+                const dadosAtualizados = {
                     valor: valorDigitado,
                     categoria: categoriaFinal,
                     descricao: campoDescricao.value.trim(),
                     data: Timestamp.fromDate(construirDataComHorarioReal(campoData.value))
-                });
+                };
+
+                // Só mexe em forma de pagamento/banco se esses campos
+                // estiverem visíveis nessa edição (Gasto ou Extra normais —
+                // Guardar e Fatura do Cartão não passam por aqui, e ficam
+                // com o que já tinham, sem alteração nenhuma)
+                if (!campoFormaPagamentoWrapper.hidden) {
+                    dadosAtualizados.formaPagamento = campoFormaPagamento.value;
+                    dadosAtualizados.banco = (campoFormaPagamento.value === "pix" || campoFormaPagamento.value === "debito")
+                        ? (campoBancoPagamento.value === "__sem_banco__" ? null : campoBancoPagamento.value)
+                        : null;
+                } else if (!campoBancoPagamentoWrapper.hidden) {
+                    dadosAtualizados.banco = campoBancoPagamento.value || null;
+                }
+
+                await updateDoc(doc(db, "usuarios", uidAtual, "lancamentos", idEmEdicao), dadosAtualizados);
 
                 fecharModal();
                 mostrarToast("Alterações salvas ✓");
@@ -1213,6 +1469,8 @@ document.addEventListener("DOMContentLoaded", function () {
         // ---- Fluxo de CRIAÇÃO ----
         const ehParcelado = tipoSelecionado === "gasto" && campoParcelado.checked;
         const numeroParcelas = ehParcelado ? parseInt(campoParcelas.value, 10) : 1;
+        const noCartaoCredito = tipoSelecionado === "gasto" && !modoGuardar && campoFormaPagamento.value === "credito";
+        const cartaoEscolhidoId = noCartaoCredito ? campoCartaoPagamento.value : null;
 
         if (ehParcelado && (!numeroParcelas || numeroParcelas < 2)) {
             mostrarAviso("Informa um número de parcelas válido (mínimo 2).");
@@ -1248,11 +1506,19 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
             if (campoCategoria.value === "__nova__" && !modoGuardar) {
                 // Se for Fixo/Parcelado, usa o mesmo vencimento já perguntado
-                // ali embaixo (não pergunta de novo, os dois ficam sincronizados)
+                // ali embaixo (não pergunta de novo, os dois ficam sincronizados).
+                // No Crédito, esse campo fica escondido (usa o vencimento do
+                // próprio cartão) — busca ele ali, em vez do campo vazio.
                 const usandoFixoOuParcelado = campoFixo.checked || campoParcelado.checked;
-                const vencimentoNovaCategoria = usandoFixoOuParcelado
-                    ? (parseInt(campoVencimentoLancamento.value, 10) || null)
-                    : (parseInt(campoVencimentoNovaCategoria.value, 10) || null);
+                let vencimentoNovaCategoria;
+                if (noCartaoCredito) {
+                    const cartaoEscolhidoParaCategoria = cartoesCustomizados.find((c) => c.id === cartaoEscolhidoId);
+                    vencimentoNovaCategoria = (cartaoEscolhidoParaCategoria && cartaoEscolhidoParaCategoria.diaVencimento) || null;
+                } else if (usandoFixoOuParcelado) {
+                    vencimentoNovaCategoria = parseInt(campoVencimentoLancamento.value, 10) || null;
+                } else {
+                    vencimentoNovaCategoria = parseInt(campoVencimentoNovaCategoria.value, 10) || null;
+                }
                 const referenciaCategoria = await addDoc(collection(db, "usuarios", uidAtual, "categorias"), {
                     nome: categoriaFinal,
                     tipo: tipoSelecionado,
@@ -1268,22 +1534,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 metasCustomizadas.push({ nome: metaFinal, id: referenciaMeta.id });
             }
 
-            if (modoGuardar && campoBanco.value === "__novo__") {
-                const referenciaBanco = await addDoc(collection(db, "usuarios", uidAtual, "bancos"), {
-                    nome: bancoFinal
-                });
-                bancosCustomizados.push({ nome: bancoFinal, id: referenciaBanco.id });
-            }
-
             const dataEscolhida = construirDataComHorarioReal(campoData.value);
             const descricaoBase = campoDescricao.value.trim();
+            let mesDaFaturaCredito = null;
 
-            if (ehParcelado) {
-                await salvarParcelado(valorDigitado, numeroParcelas, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10));
+            if (noCartaoCredito) {
+                mesDaFaturaCredito = await salvarNoCartao(valorDigitado, categoriaFinal, descricaoBase, cartaoEscolhidoId, campoFixo.checked, ehParcelado, numeroParcelas);
+            } else if (ehParcelado) {
+                await salvarParcelado(valorDigitado, numeroParcelas, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10), campoFormaPagamento.value, campoBancoPagamento.value, campoChavePix.value.trim());
             } else if (campoFixo.checked) {
-                await salvarFixo(valorDigitado, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10));
+                await salvarFixo(valorDigitado, categoriaFinal, descricaoBase, dataEscolhida, parseInt(campoVencimentoLancamento.value, 10), campoFormaPagamento.value, campoBancoPagamento.value, campoChavePix.value.trim());
             } else {
-                await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), {
+                const dadosLancamento = {
                     tipo: tipoSelecionado,
                     valor: valorDigitado,
                     categoria: categoriaFinal,
@@ -1291,13 +1553,30 @@ document.addEventListener("DOMContentLoaded", function () {
                     data: Timestamp.fromDate(dataEscolhida),
                     mesReferencia: mesReferenciaString(mesSelecionado),
                     criadoEm: serverTimestamp(),
-                    ...(modoGuardar ? { meta: metaFinal, banco: bancoFinal } : {})
-                });
+                    ...(modoGuardar ? { meta: metaFinal, banco: bancoFinal, bancoOrigem: bancoOrigemFinal } : {})
+                };
+
+                // Forma de pagamento (Gasto) ou banco de entrada (Extra) —
+                // nenhum dos dois se aplica ao modo Guardar, que já tem seu
+                // próprio sistema de banco (meta/cofrinho)
+                if (tipoSelecionado === "gasto" && !modoGuardar) {
+                    dadosLancamento.formaPagamento = campoFormaPagamento.value;
+                    if (campoFormaPagamento.value === "pix" || campoFormaPagamento.value === "debito") {
+                        dadosLancamento.banco = campoBancoPagamento.value;
+                    }
+                }
+                if (tipoSelecionado === "ganho" && !modoGuardar) {
+                    dadosLancamento.banco = campoBancoPagamento.value;
+                }
+
+                await addDoc(collection(db, "usuarios", uidAtual, "lancamentos"), dadosLancamento);
             }
 
             fecharModal();
 
-            if (ehParcelado) {
+            if (noCartaoCredito) {
+                mostrarToast("Compra no crédito registrada ✓ — entra na próxima fatura, não desconta o saldo agora.");
+            } else if (ehParcelado) {
                 mostrarToast(`Parcelamento criado ✓ (${numeroParcelas}x)`);
             } else if (campoFixo.checked) {
                 mostrarToast("Gasto fixo criado ✓");
@@ -1315,7 +1594,58 @@ document.addEventListener("DOMContentLoaded", function () {
     // Cria uma "pendência" por parcela — nenhuma delas mexe no saldo ainda.
     // Só quando a pessoa marcar como paga (lá na seção "Pagamentos Pendentes")
     // é que vira um lançamento de verdade.
-    async function salvarParcelado(valorTotal, numeroParcelas, categoria, descricaoBase, dataInicial, diaVencimento) {
+    // Cria pendência(s) pro Crédito — SEMPRE a partir do MÊS SEGUINTE (compra
+    // de hoje só aparece na próxima fatura, do jeito que cartão de crédito
+    // de verdade funciona), usando o dia de vencimento que já está cadastrado
+    // no cartão escolhido (não pergunta de novo). Cobre os 3 casos: compra
+    // avulsa (uma vez só), fixo (repete 12 meses) e parcelado (N vezes).
+    async function salvarNoCartao(valor, categoria, descricaoBase, cartaoId, ehFixo, ehParcelado, numeroParcelas) {
+        const cartaoEscolhido = cartoesCustomizados.find((c) => c.id === cartaoId);
+        const diaVencimentoCartao = (cartaoEscolhido && cartaoEscolhido.diaVencimento) || 1;
+        const hoje = new Date();
+        const nomeItem = descricaoBase || categoria;
+        const quantasVezes = ehFixo ? 12 : (ehParcelado ? numeroParcelas : 1);
+        const grupoId = (ehFixo || ehParcelado) ? `${ehFixo ? "fixo" : "parc"}_credito_${Date.now()}` : null;
+
+        const valorParcela = ehParcelado ? Math.floor((valor / numeroParcelas) * 100) / 100 : valor;
+        const diferencaCentavos = ehParcelado ? Math.round((valor - valorParcela * numeroParcelas) * 100) / 100 : 0;
+
+        for (let indice = 0; indice < quantasVezes; indice++) {
+            const anoDestino = hoje.getFullYear();
+            const mesDestino = hoje.getMonth() + 1 + indice; // +1 = sempre começa no mês seguinte
+            const ultimoDiaDoMes = new Date(anoDestino, mesDestino + 1, 0).getDate();
+            const diaFinal = Math.min(diaVencimentoCartao, ultimoDiaDoMes);
+            const mesReferencia = mesReferenciaString(new Date(anoDestino, mesDestino, 1));
+            const ehUltima = indice === quantasVezes - 1;
+            const valorDessaVez = (ehParcelado && ehUltima) ? valorParcela + diferencaCentavos : valorParcela;
+
+            const dadosPendencia = {
+                valor: valorDessaVez,
+                categoria,
+                descricao: nomeItem,
+                diaDoMes: diaFinal,
+                mesReferencia,
+                origem: ehFixo ? "fixo" : (ehParcelado ? "parcelado" : "avulsa"),
+                noCartao: true,
+                cartaoId,
+                formaPagamento: "credito",
+                pago: false,
+                criadoEm: serverTimestamp()
+            };
+            if (ehParcelado) {
+                dadosPendencia.valorTotalCompra = valor;
+                dadosPendencia.numeroParcela = indice + 1;
+                dadosPendencia.totalParcelas = numeroParcelas;
+            }
+            if (grupoId) dadosPendencia.grupoId = grupoId;
+
+            await addDoc(collection(db, "usuarios", uidAtual, "pendencias"), dadosPendencia);
+        }
+
+        return mesReferenciaString(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1));
+    }
+
+    async function salvarParcelado(valorTotal, numeroParcelas, categoria, descricaoBase, dataInicial, diaVencimento, formaPagamento, banco, chavePix) {
         const valorParcela = Math.floor((valorTotal / numeroParcelas) * 100) / 100;
         const diferencaCentavos = Math.round((valorTotal - valorParcela * numeroParcelas) * 100) / 100;
         const grupoId = `parc_${Date.now()}`;
@@ -1343,13 +1673,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 totalParcelas: numeroParcelas,
                 grupoId,
                 noCartao: false,
+                formaPagamento,
+                ...(banco ? { banco } : {}),
+                ...(chavePix ? { chavePix } : {}),
                 pago: false,
                 criadoEm: serverTimestamp()
             });
         }
     }
 
-    async function salvarFixo(valor, categoria, descricaoBase, dataInicial, diaVencimento) {
+    async function salvarFixo(valor, categoria, descricaoBase, dataInicial, diaVencimento, formaPagamento, banco, chavePix) {
         const grupoId = `fixo_${Date.now()}`;
         const diaOriginal = diaVencimento || dataInicial.getDate(); // reserva de segurança
 
@@ -1369,6 +1702,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 origem: "fixo",
                 grupoId,
                 noCartao: false,
+                formaPagamento,
+                ...(banco ? { banco } : {}),
+                ...(chavePix ? { chavePix } : {}),
                 pago: false,
                 criadoEm: serverTimestamp()
             });
@@ -1405,7 +1741,11 @@ document.addEventListener("DOMContentLoaded", function () {
         renderizarFaturaCartao(pendenciasNoCartao);
     }
 
+    const LIMITE_PENDENCIAS_RECOLHIDO = 3;
+    let ultimosPendenciasNormaisRenderizadas = [];
+
     function renderizarListaPendenciasNormais(documentos) {
+        ultimosPendenciasNormaisRenderizadas = documentos;
         listaPendencias.innerHTML = "";
         pendenciasVazio.hidden = documentos.length > 0;
 
@@ -1417,10 +1757,35 @@ document.addEventListener("DOMContentLoaded", function () {
             return ehFixoA - ehFixoB;
         });
 
-        documentosOrdenados.forEach((documento) => {
+        // Lembra se a pessoa deixou recolhido ou expandido da última vez —
+        // guardado no aparelho, persiste entre sessões
+        const estaExpandido = localStorage.getItem("pendencias_expandido") === "true";
+        const precisaRecolher = !estaExpandido && documentosOrdenados.length > LIMITE_PENDENCIAS_RECOLHIDO;
+        const visiveis = precisaRecolher ? documentosOrdenados.slice(0, LIMITE_PENDENCIAS_RECOLHIDO) : documentosOrdenados;
+
+        visiveis.forEach((documento) => {
             listaPendencias.appendChild(criarItemPendencia(documento, true));
         });
+
+        // O botão sempre mostra quantidade + valor total, mesmo recolhido —
+        // de propósito, pra nunca ficar "escondido" que existe conta
+        // esperando, mesmo quando a lista tá fechada
+        if (documentosOrdenados.length > LIMITE_PENDENCIAS_RECOLHIDO) {
+            const totalPendencias = documentosOrdenados.reduce((soma, documento) => soma + documento.data().valor, 0);
+            botaoVerMaisPendencias.hidden = false;
+            botaoVerMaisPendencias.textContent = precisaRecolher
+                ? `Ver mais (${documentosOrdenados.length} pendências · ${formatarMoeda(totalPendencias)}) ▼`
+                : `Ver menos (${documentosOrdenados.length} pendências · ${formatarMoeda(totalPendencias)}) ▲`;
+        } else {
+            botaoVerMaisPendencias.hidden = true;
+        }
     }
+
+    botaoVerMaisPendencias.addEventListener("click", () => {
+        const estaExpandidoAgora = localStorage.getItem("pendencias_expandido") === "true";
+        localStorage.setItem("pendencias_expandido", String(!estaExpandidoAgora));
+        renderizarListaPendenciasNormais(ultimosPendenciasNormaisRenderizadas);
+    });
 
     // Monta o <li> de uma pendência. mostrarBotaoPago=false esconde o botão
     // "Marcar como paga" — usado pros itens "No Cartão", que só são pagos
@@ -1430,7 +1795,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const parcelasRestantes = dados.origem === "parcelado" ? dados.totalParcelas - dados.numeroParcela : null;
         const badgeParcela = dados.origem === "parcelado"
             ? `<span class="badge-parcela">Parcela ${dados.numeroParcela}/${dados.totalParcelas}</span>`
-            : `<span class="badge-parcela">Fixo</span>`;
+            : (dados.origem === "avulsa" ? `<span class="badge-parcela">Compra única</span>` : `<span class="badge-parcela">Fixo</span>`);
 
         const badgeQuaseAcabando = (parcelasRestantes !== null && parcelasRestantes <= 1)
             ? `<span class="badge-parcela badge-quase-acabando">Quase acabando!</span>`
@@ -1450,6 +1815,24 @@ document.addEventListener("DOMContentLoaded", function () {
             textoValorTotal = `<div class="texto-pago-em" style="color: var(--text-muted);">Total da compra: ${formatarMoeda(totalDaCompra)}</div>`;
         }
 
+        // Chave PIX: se a forma de pagamento for PIX, sempre oferece um
+        // jeito de adicionar/editar a chave — e, se já tiver uma salva,
+        // mostra o botão de copiar também, pra usar na hora de pagar sem
+        // precisar ir atrás em outro lugar (WhatsApp, etc.)
+        let linhaChavePixHtml = "";
+        if (dados.formaPagamento === "pix") {
+            // Escapa aspas nos dois campos que viram atributo HTML — sem
+            // isso, uma descrição ou chave com aspas (tipo Aluguel "novo
+            // apto") quebraria o atributo e bagunçaria o botão inteiro
+            const chaveEscapada = (dados.chavePix || "").replace(/"/g, "&quot;");
+            const descricaoEscapada = (dados.descricao || "").replace(/"/g, "&quot;");
+            const botaoCopiar = dados.chavePix
+                ? `<button type="button" class="link-botao-simples botao-copiar-pix" data-chave="${chaveEscapada}">Copiar PIX</button>`
+                : "";
+            const botaoEditar = `<button type="button" class="link-botao-simples botao-editar-pix" data-id="${documento.id}" data-grupo="${dados.grupoId || ""}" data-chave-atual="${chaveEscapada}" data-descricao="${descricaoEscapada}">${dados.chavePix ? "Editar chave" : "+ Adicionar chave PIX"}</button>`;
+            linhaChavePixHtml = `<div class="linha-acoes-pix" style="display:flex; gap:14px; margin-top:6px;">${botaoCopiar}${botaoEditar}</div>`;
+        }
+
         const botaoPagoHtml = mostrarBotaoPago ? `
                 <button class="botao-marcar-pago ${dados.pago ? "pago" : ""}" data-id="${documento.id}" data-pago="${dados.pago}">
                     ${dados.pago ? "✓ Paga" : "Marcar como paga"}
@@ -1463,6 +1846,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 <div class="meta-conta">${dados.categoria} · Vence dia ${dados.diaDoMes}</div>
                 ${textoValorTotal}
                 ${textoPagoEm}
+                ${linhaChavePixHtml}
             </div>
             <span class="valor-conta">${formatarMoeda(dados.valor)}</span>
             <div class="status-conta">
@@ -1480,12 +1864,21 @@ document.addEventListener("DOMContentLoaded", function () {
     // Mostra só um resumo (nome do cartão + valor total da fatura) com link
     // pra tela própria do Cartão de Crédito, onde toda a gestão acontece —
     // adicionar item, marcar fatura como paga, editar nome do cartão, etc.
+    // A seção "Bancos e Cartões" na tela inicial só fica escondida se as
+    // DUAS linhas (bancos e fatura) não tiverem nada pra mostrar — cada uma
+    // controla a própria visibilidade, essa função só combina as duas
+    function atualizarVisibilidadeSecaoBancosCartoes() {
+        secaoFaturaCartao.hidden = linkResumoFatura.hidden && linkResumoBancos.hidden;
+    }
+
     function renderizarFaturaCartao(pendenciasNoCartao) {
         if (pendenciasNoCartao.length === 0) {
-            secaoFaturaCartao.hidden = true;
+            linkResumoFatura.hidden = true;
+            atualizarVisibilidadeSecaoBancosCartoes();
             return;
         }
-        secaoFaturaCartao.hidden = false;
+        linkResumoFatura.hidden = false;
+        atualizarVisibilidadeSecaoBancosCartoes();
 
         const itensNaoPagos = pendenciasNoCartao.filter((documento) => !documento.data().pago);
         const faturaEstaPaga = itensNaoPagos.length === 0;
@@ -1503,6 +1896,65 @@ document.addEventListener("DOMContentLoaded", function () {
     // TELINHA DE EXCLUIR PENDÊNCIA (substitui os confirm() feios do navegador)
     // ==========================================================================
     let pendenciaEmExclusao = null; // { id, dados }
+    let pendenciaPixEmEdicaoId = null;
+    let grupoPixEmEdicao = null;
+
+    function abrirModalEditarPix(id, grupoId, chaveAtual, descricao) {
+        pendenciaPixEmEdicaoId = id;
+        grupoPixEmEdicao = grupoId || null;
+        campoEditarChavePix.value = chaveAtual || "";
+        textoEditarPixContexto.textContent = grupoPixEmEdicao
+            ? `Isso atualiza a chave em "${descricao}" e em todas as próximas ocorrências ainda não pagas.`
+            : `Isso atualiza a chave em "${descricao}".`;
+        mensagemAvisoEditarPix.classList.remove("visivel");
+        fundoModalEditarPix.classList.add("aberto");
+    }
+
+    botaoFecharEditarPix.addEventListener("click", () => {
+        fundoModalEditarPix.classList.remove("aberto");
+    });
+    fundoModalEditarPix.addEventListener("click", (evento) => {
+        if (evento.target === fundoModalEditarPix) fundoModalEditarPix.classList.remove("aberto");
+    });
+
+    botaoSalvarEditarPix.addEventListener("click", async () => {
+        const novaChave = campoEditarChavePix.value.trim();
+        mensagemAvisoEditarPix.classList.remove("visivel");
+
+        const spinner = botaoSalvarEditarPix.querySelector(".spinner-botao");
+        botaoSalvarEditarPix.disabled = true;
+        spinner.hidden = false;
+
+        try {
+            if (grupoPixEmEdicao) {
+                // Propaga pra todas as ocorrências do mesmo grupo (Fixo ou
+                // Parcelado) que ainda não foram pagas — senão a chave só
+                // ficaria salva no mês que você editou, e os próximos meses
+                // continuariam sem ela
+                const referenciaPendencias = collection(db, "usuarios", uidAtual, "pendencias");
+                const consultaGrupo = query(referenciaPendencias, where("grupoId", "==", grupoPixEmEdicao), where("pago", "==", false));
+                const resultado = await getDocs(consultaGrupo);
+
+                const lote = writeBatch(db);
+                resultado.forEach((documento) => {
+                    lote.update(documento.ref, { chavePix: novaChave || null });
+                });
+                await lote.commit();
+            } else if (pendenciaPixEmEdicaoId) {
+                // Sem grupo (compra avulsa) — atualiza só essa mesmo
+                await updateDoc(doc(db, "usuarios", uidAtual, "pendencias", pendenciaPixEmEdicaoId), { chavePix: novaChave || null });
+            }
+
+            fundoModalEditarPix.classList.remove("aberto");
+            mostrarToast("Chave PIX salva ✓");
+        } catch (erro) {
+            mensagemAvisoEditarPix.textContent = "Não deu pra salvar agora. Confere sua internet e tenta de novo.";
+            mensagemAvisoEditarPix.classList.add("visivel");
+        } finally {
+            botaoSalvarEditarPix.disabled = false;
+            spinner.hidden = true;
+        }
+    });
     let escopoExclusaoEscolhido = null; // "so-essa" | "todas"
 
     function abrirModalExcluirPendencia() {
@@ -1582,6 +2034,23 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     async function handlerCliqueListaPendencias(evento) {
+        const botaoCopiarPix = evento.target.closest(".botao-copiar-pix");
+        if (botaoCopiarPix) {
+            try {
+                await navigator.clipboard.writeText(botaoCopiarPix.dataset.chave);
+                mostrarToast("Chave PIX copiada ✓");
+            } catch (erro) {
+                mostrarToast("Não deu pra copiar automaticamente — copia manualmente.");
+            }
+            return;
+        }
+
+        const botaoEditarPix = evento.target.closest(".botao-editar-pix");
+        if (botaoEditarPix) {
+            abrirModalEditarPix(botaoEditarPix.dataset.id, botaoEditarPix.dataset.grupo, botaoEditarPix.dataset.chaveAtual, botaoEditarPix.dataset.descricao);
+            return;
+        }
+
         const botaoExcluir = evento.target.closest(".botao-excluir-conta");
         if (botaoExcluir) {
             const referenciaPendenciaExcluir = doc(db, "usuarios", uidAtual, "pendencias", botaoExcluir.dataset.id);
@@ -1643,7 +2112,9 @@ document.addEventListener("DOMContentLoaded", function () {
             descricao: dadosPendencia.descricao,
             data: Timestamp.fromDate(dataDoPagamento),
             mesReferencia: dadosPendencia.mesReferencia,
-            criadoEm: serverTimestamp()
+            criadoEm: serverTimestamp(),
+            ...(dadosPendencia.formaPagamento ? { formaPagamento: dadosPendencia.formaPagamento } : {}),
+            ...(dadosPendencia.banco ? { banco: dadosPendencia.banco } : {})
         });
 
         await updateDoc(referenciaPendencia, { pago: true, lancamentoId: novoLancamento.id, pagoEm: serverTimestamp() });
