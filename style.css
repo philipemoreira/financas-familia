@@ -79,9 +79,9 @@ body#pagina-login {
 }
 
 .selo-marca-carregamento {
-    font-size: 16px;
+    font-size: 34px;
     font-weight: 700;
-    letter-spacing: 3px;
+    letter-spacing: 2.5px;
     text-transform: uppercase;
     color: var(--accent);
     opacity: 0;
@@ -106,11 +106,11 @@ body#pagina-login {
     width: 0%;
     background-color: #FFFFFF;
     border-radius: 20px;
-    animation: preencher-barra-carregamento 12s linear forwards;
+    animation: preencher-barra-carregamento 9s linear forwards;
 }
 
 .texto-status-carregamento {
-    font-size: 13px;
+    font-size: 15px;
     color: var(--text-muted);
     margin: 0;
     opacity: 0;
